@@ -3,19 +3,24 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: 255, 255, 255;
+  --foreground: 0, 0, 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: rgb(var(--foreground));
+  background: rgb(var(--background));
+  font-family: "EB Garamond", Georgia, serif;
+}
+
+.nav-link {
+  @apply text-sm uppercase tracking-wider hover:opacity-60 transition-opacity;
+}
+
+.social-link {
+  @apply w-8 h-8 flex items-center justify-center rounded-full border border-black/10 hover:border-black/30 transition-colors;
 }
