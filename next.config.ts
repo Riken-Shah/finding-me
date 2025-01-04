@@ -4,7 +4,8 @@ import { setupDevPlatform } from '@cloudflare/next-on-pages/next-dev';
 // (when running the application with `next dev`), for more information see:
 // https://github.com/cloudflare/next-on-pages/blob/main/internal-packages/next-dev/README.md
 if (process.env.NODE_ENV === 'development') {
-  await setupDevPlatform();
+  // Removed await, as it was causing "ReferenceError: await is not defined"
+   setupDevPlatform();
 }
 
 import type { NextConfig } from "next";
