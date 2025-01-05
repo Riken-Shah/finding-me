@@ -5,13 +5,17 @@ import { setupDevPlatform } from '@cloudflare/next-on-pages/next-dev';
 // https://github.com/cloudflare/next-on-pages/blob/main/internal-packages/next-dev/README.md
 if (process.env.NODE_ENV === 'development') {
   // Removed await, as it was causing "ReferenceError: await is not defined"
-   setupDevPlatform();
+    setupDevPlatform();
 }
 
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Enable Cloudflare specific features
+  // images: {
+  //   unoptimized: true, // Required for Cloudflare Pages
+  // },
+  // output: 'standalone',
 };
 
 export default nextConfig;

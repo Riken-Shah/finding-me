@@ -1,24 +1,30 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
+'use client';
 
-const inter = Inter({ subsets: ["latin"] });
-
-export const metadata: Metadata = {
-  title: "Your Name - AI x Software Engineering x Art",
-  description: "Software Engineer working at the intersection of AI, Software Engineering, and Art",
-};
+import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
+import { useAnalytics } from '@/hooks/useAnalytics';
+import './globals.css';
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    // Skip tracking for analytics pages
+    if (pathname?.includes('/analytics')) {
+      return;
+    }
+
+
+
+  }, [pathname]);
+
   return (
-    <html lang="en" className="scroll-smooth">
-      <body className={`${inter.className} bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100`}>
-        {children}
-      </body>
+    <html lang="en">
+      <body>{children}</body>
     </html>
   );
 } 

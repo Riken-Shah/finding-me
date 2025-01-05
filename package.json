@@ -10,12 +10,25 @@
     "pages:build": "pnpm next-on-pages",
     "preview": "pnpm pages:build && wrangler pages dev",
     "deploy": "pnpm pages:build && wrangler pages deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareEnv env.d.ts"
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv env.d.ts",
+    "db:migrate": "wrangler d1 execute website-analytics-dev --local --file=./migrations/0001_analytics.sql",
+    "db:migrate:prod": "wrangler d1 execute website-analytics --file=./migrations/0001_analytics.sql",
+    "db:clean": "wrangler d1 delete website-analytics-dev --local && wrangler d1 create website-analytics-dev",
+    "db:reset": "pnpm db:clean && pnpm db:migrate",
+    "db:shell": "wrangler d1 execute website-analytics-dev --local --command '.tables'",
+    "db:info": "wrangler d1 execute website-analytics-dev --local --command 'SELECT COUNT(*) as count FROM sessions; SELECT COUNT(*) as count FROM pageviews; SELECT COUNT(*) as count FROM events;'"
   },
   "dependencies": {
+    "@tremor/react": "^3.18.6",
+    "@types/leaflet": "^1.9.15",
+    "cookie": "^1.0.2",
+    "leaflet": "^1.9.4",
     "next": "15.1.0",
+    "pigeon-maps": "^0.22.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-leaflet": "^5.0.0",
+    "recharts": "2.15.0"
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "1",
