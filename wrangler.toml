@@ -3,22 +3,22 @@ compatibility_date = "2024-12-30"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".vercel/output/static"
 
-# Development database (local)
+# Preview environment (used for development and preview deployments)
 [[d1_databases]]
 binding = "DB"
 database_name = "website-analytics-dev"
 database_id = "1b1e0384-e617-4b2d-b8a4-4baf966c9148"
-preview_database_id = "1b1e0384-e617-4b2d-b8a4-4baf966c9148"
 
-# Production environments
 [env.preview]
 [[env.preview.d1_databases]]
 binding = "DB"
-database_name = "website-analytics"
-database_id = "000d5a9f-9a87-474d-8a74-11d300d2581f"
+database_name = "website-analytics-dev"
+database_id = "1b1e0384-e617-4b2d-b8a4-4baf966c9148"
 
+# Production environment
 [env.production]
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "website-analytics"
-database_id = "000d5a9f-9a87-474d-8a74-11d300d2581f"
+database_id = "cb6b2d7a-c0c1-44de-8483-dd2a8ceb38e8"
+migrations_dir = "migrations"

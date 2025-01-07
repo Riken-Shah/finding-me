@@ -1,9 +1,74 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useAnalytics } from '@/hooks/useAnalytics';
 
 export default function Home() {
-  const { trackClick } = useAnalytics();
+  const { trackClick, trackScroll } = useAnalytics();
+
+  useEffect(() => {
+    let lastScrollY = 0;
+    let scrollTimeout: NodeJS.Timeout;
+
+    const handleScroll = () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        const scrollPercent = Math.round(
+          (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100
+        );
+        const direction = window.scrollY > lastScrollY ? 'down' : 'up';
+        lastScrollY = window.scrollY;
+
+        trackScroll({
+          percent: scrollPercent,
+          direction,
+          viewport_height: window.innerHeight,
+          document_height: document.documentElement.scrollHeight
+        });
+      }, 100);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      clearTimeout(scrollTimeout);
+    };
+  }, [trackScroll]);
+
+  const handleClick = (element: string, href?: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    trackClick({
+      element,
+      href,
+      x: e.clientX,
+      y: e.clientY,
+      viewport_width: window.innerWidth,
+      viewport_height: window.innerHeight
+    });
+    
+    if (href) {
+      if (href.startsWith('#')) {
+        document.querySelector(href)?.scrollIntoView({ behavior: 'smooth' });
+      } else if (href.startsWith('mailto:')) {
+        window.location.href = href;
+      } else {
+        window.open(href, '_blank', 'noopener,noreferrer');
+      }
+    }
+  };
+
+  const handleEssayClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const clickEvent = {
+      element: 'essay_read_more',
+      href: '#',
+      x: e.clientX,
+      y: e.clientY,
+      viewport_width: window.innerWidth,
+      viewport_height: window.innerHeight
+    };
+    trackClick(clickEvent);
+  };
 
   return (
     <main className="min-h-screen">
@@ -20,14 +85,14 @@ export default function Home() {
             <a
               href="#work"
               className="px-12 py-4 bg-white text-[rgb(15,23,42)] hover:bg-gray-100 transition-colors"
-              onClick={() => trackClick('work_button')}
+              onClick={handleClick('work_button', '#work')}
             >
               See my work
             </a>
             <a
               href="#contact"
               className="px-12 py-4 border border-white hover:bg-white/5 transition-colors"
-              onClick={() => trackClick('contact_button')}
+              onClick={handleClick('contact_button', '#contact')}
             >
               Get in touch
             </a>
@@ -42,7 +107,7 @@ export default function Home() {
           <div className="space-y-8">
             <div 
               className="p-8 border border-white/10 hover:border-white/30 transition-colors"
-              onClick={() => trackClick('current_work_item')}
+              onClick={handleClick('current_work_item')}
             >
               <h3 className="text-xl sm:text-2xl font-semibold mb-4">Project Title</h3>
               <p className="text-gray-400 text-lg">
@@ -60,7 +125,7 @@ export default function Home() {
           <div className="space-y-8">
             <div 
               className="group p-8 border border-white/10 hover:border-white/30 transition-colors"
-              onClick={() => trackClick('project_item')}
+              onClick={handleClick('project_item')}
             >
               <h3 className="text-xl sm:text-2xl font-semibold mb-4 group-hover:text-white/80">Project Name</h3>
               <p className="text-gray-400 text-lg mb-6">
@@ -83,7 +148,7 @@ export default function Home() {
           <div className="space-y-8">
             <div 
               className="p-8 border border-white/10 hover:border-white/30 transition-colors"
-              onClick={() => trackClick('essay_item')}
+              onClick={handleClick('essay_item')}
             >
               <h3 className="text-xl sm:text-2xl font-semibold mb-4">Essay Title</h3>
               <p className="text-gray-400 text-lg mb-6">
@@ -92,10 +157,7 @@ export default function Home() {
               <a 
                 href="#" 
                 className="inline-flex items-center text-lg hover:text-white/80 transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  trackClick('essay_read_more');
-                }}
+                onClick={handleEssayClick}
               >
                 Read more <span className="ml-2">→</span>
               </a>
@@ -115,7 +177,7 @@ export default function Home() {
             <a
               href="mailto:your.email@example.com"
               className="hover:text-white/80 transition-colors"
-              onClick={() => trackClick('contact_email')}
+              onClick={handleClick('contact_email', 'mailto:your.email@example.com')}
             >
               Email
             </a>
@@ -124,7 +186,7 @@ export default function Home() {
               className="hover:text-white/80 transition-colors"
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() => trackClick('contact_github')}
+              onClick={handleClick('contact_github', 'https://github.com/yourusername')}
             >
               GitHub
             </a>
@@ -133,7 +195,7 @@ export default function Home() {
               className="hover:text-white/80 transition-colors"
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() => trackClick('contact_linkedin')}
+              onClick={handleClick('contact_linkedin', 'https://linkedin.com/in/yourusername')}
             >
               LinkedIn
             </a>

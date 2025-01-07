@@ -12,8 +12,9 @@
     "deploy": "pnpm pages:build && wrangler pages deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv env.d.ts",
     "db:migrate": "wrangler d1 execute website-analytics-dev --local --file=./migrations/0001_analytics.sql",
-    "db:migrate:prod": "wrangler d1 execute website-analytics --file=./migrations/0001_analytics.sql",
+    "db:migrate:prod": "wrangler d1 execute website-analytics --remote --file=./migrations/0001_analytics.sql",
     "db:clean": "wrangler d1 delete website-analytics-dev --local && wrangler d1 create website-analytics-dev",
+    "db:clean:prod": "wrangler d1 delete website-analytics  && wrangler d1 create website-analytics --remote",
     "db:reset": "pnpm db:clean && pnpm db:migrate",
     "db:shell": "wrangler d1 execute website-analytics-dev --local --command '.tables'",
     "db:info": "wrangler d1 execute website-analytics-dev --local --command 'SELECT COUNT(*) as count FROM sessions; SELECT COUNT(*) as count FROM pageviews; SELECT COUNT(*) as count FROM events;'"

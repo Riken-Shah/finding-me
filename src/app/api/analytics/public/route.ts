@@ -9,10 +9,7 @@ import {
   DBCountryStats,
   DBDeviceStats,
   DBEngagementStats,
-  SessionMetrics,
-  PageMetrics,
-  TrafficMetrics,
-  EngagementMetrics
+
 } from '@/types/analytics';
 
 export const runtime = 'edge';
@@ -31,9 +28,9 @@ function getDB(): D1Database {
       (SELECT COUNT(*) FROM sessions) as session_count,
       (SELECT COUNT(*) FROM pageviews) as pageview_count,
       (SELECT COUNT(*) FROM events) as event_count
-  `).first().then(dbInfo => {
-    console.log('Database info (public):', dbInfo);
-  }).catch(error => {
+  `).first().then((dbInfo: { session_count: number; pageview_count: number; event_count: number }) => {
+    console.log('Dtabase info (public):', dbInfo);
+  }).catch((error: Error) => {
     console.error('Failed to get database info:', error);
   });
 

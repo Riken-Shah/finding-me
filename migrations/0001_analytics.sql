@@ -45,14 +45,13 @@ CREATE TABLE IF NOT EXISTS pageviews (
 
 -- Create events table
 CREATE TABLE IF NOT EXISTS events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  session_id TEXT NOT NULL,
-  page_path TEXT NOT NULL,
-  event_type TEXT NOT NULL,
+  event_id INTEGER PRIMARY KEY AUTOINCREMENT,
   event_name TEXT NOT NULL,
-  event_data TEXT,
-  timestamp DATETIME NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  event_data TEXT NOT NULL,
+  page_path TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  event_type TEXT CHECK(event_type IN ('click', 'scroll', 'section_view', 'engagement')) NOT NULL,
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (session_id) REFERENCES sessions(session_id)
 );
 

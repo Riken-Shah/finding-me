@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { useAnalytics } from '@/hooks/useAnalytics';
 import './globals.css';
 
 export default function RootLayout({

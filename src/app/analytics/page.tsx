@@ -9,20 +9,67 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,
   Legend,
-  AreaChart,
-  Area,
 } from 'recharts';
+
+interface PageStats {
+  page_path: string;
+  views: number;
+  unique_views: number;
+  avg_time: number;
+  scroll_depth: number;
+  exit_rate: number;
+}
+
+interface TrafficSource {
+  source: string;
+  sessions: number;
+  bounce_rate: number;
+}
+
+interface DeviceStats {
+  device: string;
+  sessions: number;
+}
+
+interface CountryStats {
+  country: string;
+  sessions: number;
+  users: number;
+  bounce_rate: number;
+}
+
+
+interface AnalyticsData {
+  sessions: {
+    total_sessions: number;
+    new_users: number;
+    returning_users: number;
+    bounce_rate: number;
+    avg_duration: number;
+  };
+  engagement: {
+    pageviews_per_session: number;
+    avg_scroll_depth: number;
+  };
+  pages: {
+    stats: PageStats[];
+    scrollDepth: { [key: number]: number };
+  };
+  traffic: {
+    bySource: TrafficSource[];
+    byDevice: DeviceStats[];
+    byCountry: CountryStats[];
+  };
+}
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 // Helper function to format numbers safely
-const formatNumber = (num: number | null | undefined, decimals: number = 0): string => {
+const formatNumber = (num: number | null | undefined, decimals = 0): string => {
   if (num === null || num === undefined) return '0';
   return decimals > 0 ? num.toFixed(decimals) : num.toLocaleString();
 };
@@ -43,51 +90,11 @@ const formatPercent = (num: number | null | undefined): string => {
   return `${num.toFixed(1)}%`;
 };
 
-// Add new helper function for sorting sections by engagement
-const getSectionEngagement = (data: any) => {
-  const sections = new Map();
-  
-  // Collect events by section
-  data.pages.stats.forEach((page: any) => {
-    const pathParts = page.page_path.split('/').filter(Boolean);
-    const section = pathParts[0] || 'home';
-    
-    if (!sections.has(section)) {
-      sections.set(section, {
-        name: section,
-        views: 0,
-        unique_views: 0,
-        avg_time: 0,
-        scroll_depth: 0,
-        engagement_score: 0
-      });
-    }
-    
-    const sectionData = sections.get(section);
-    sectionData.views += page.views || 0;
-    sectionData.unique_views += page.unique_views || 0;
-    sectionData.avg_time += page.avg_time || 0;
-    sectionData.scroll_depth += page.scroll_depth || 0;
-  });
-  
-  // Calculate engagement score and format data
-  return Array.from(sections.values())
-    .map(section => ({
-      ...section,
-      engagement_score: (
-        (section.views * 0.3) + 
-        (section.unique_views * 0.2) + 
-        (section.avg_time * 0.25) + 
-        (section.scroll_depth * 0.25)
-      )
-    }))
-    .sort((a, b) => b.engagement_score - a.engagement_score)
-    .slice(0, 5);
-};
+
 
 export default function AnalyticsDashboard() {
   const [period, setPeriod] = useState('7d');
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -101,7 +108,7 @@ export default function AnalyticsDashboard() {
 
         const response = await fetch(`/api/analytics/public?period=${period}`, { headers });
         const json = await response.json();
-        setData(json);
+        setData(json as AnalyticsData);
       } catch (error) {
         console.error('Failed to fetch analytics:', error);
       }
@@ -205,7 +212,7 @@ export default function AnalyticsDashboard() {
                   outerRadius={100}
                   label
                 >
-                  {data.traffic.byDevice.map((entry: any, index: number) => (
+                  {data.traffic.byDevice.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -232,7 +239,7 @@ export default function AnalyticsDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {data.pages.stats.map((page: any, i: number) => (
+                {data.pages.stats.map((page, i) => (
                   <tr key={i} className={i % 2 === 0 ? 'bg-gray-50' : ''}>
                     <td className="px-4 py-2">{page.page_path}</td>
                     <td className="px-4 py-2">{formatNumber(page.views)}</td>
@@ -258,73 +265,23 @@ export default function AnalyticsDashboard() {
                     <th className="px-4 py-2">Country</th>
                     <th className="px-4 py-2">Sessions</th>
                     <th className="px-4 py-2">Users</th>
+                    <th className="px-4 py-2">Bounce Rate</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.traffic.byCountry.map((country: any, i: number) => (
+                  {data.traffic.byCountry.map((country, i) => (
                     <tr key={i} className={i % 2 === 0 ? 'bg-gray-50' : ''}>
-                      <td className="px-4 py-2">{country.country || 'Unknown'}</td>
+                      <td className="px-4 py-2">{country.country}</td>
                       <td className="px-4 py-2">{formatNumber(country.sessions)}</td>
                       <td className="px-4 py-2">{formatNumber(country.users)}</td>
+                      <td className="px-4 py-2">{formatPercent(country.bounce_rate)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : (
-              <div className="text-center text-gray-500 py-4">
-                No geographic data available
-              </div>
+              <div className="text-center text-gray-500">No geographic data available</div>
             )}
-          </div>
-        </div>
-
-        {/* Most Engaged Sections */}
-        <div className="p-6 bg-white rounded-lg shadow-lg mb-8">
-          <h2 className="text-xl font-semibold mb-4">Most Engaged Sections</h2>
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr>
-                  <th className="px-4 py-2">Section</th>
-                  <th className="px-4 py-2">Total Views</th>
-                  <th className="px-4 py-2">Unique Views</th>
-                  <th className="px-4 py-2">Avg. Time</th>
-                  <th className="px-4 py-2">Avg. Scroll Depth</th>
-                </tr>
-              </thead>
-              <tbody>
-                {getSectionEngagement(data).map((section: any, i: number) => (
-                  <tr key={i} className={i % 2 === 0 ? 'bg-gray-50' : ''}>
-                    <td className="px-4 py-2 capitalize">{section.name}</td>
-                    <td className="px-4 py-2">{formatNumber(section.views)}</td>
-                    <td className="px-4 py-2">{formatNumber(section.unique_views)}</td>
-                    <td className="px-4 py-2">{formatTime(section.avg_time)}</td>
-                    <td className="px-4 py-2">{formatPercent(section.scroll_depth)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-sm text-gray-500 mt-4">
-            Engagement score is calculated based on views, time spent, and scroll depth
-          </p>
-        </div>
-
-        {/* Scroll Depth Distribution */}
-        <div className="p-6 bg-white rounded-lg shadow-lg">
-          <h2 className="text-xl font-semibold mb-4">Scroll Depth Distribution</h2>
-          <div className="grid grid-cols-4 gap-4">
-            {[25, 50, 75, 100].map((depth) => (
-              <div key={depth} className="p-4 bg-gray-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-500">{depth}% Scroll</h3>
-                <p className="text-3xl font-bold">
-                  {formatPercent(data.pages?.scrollDepth?.[depth] || 0)}
-                </p>
-                <p className="text-sm text-gray-500">
-                  of users reached {depth}% of page
-                </p>
-              </div>
-            ))}
           </div>
         </div>
       </div>
