@@ -173,55 +173,40 @@ function formatPercent(num: number | null): string {
 }
 
 export default function DashboardPage() {
-  const [period, setPeriod] = useState('7d');
-  const [data, setData] = useState<AnalyticsData>(defaultData);
+  const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState('7d');
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true);
-      setError(null);
       try {
-        const response = await fetch(`/api/analytics/metrics?period=${period}`);
+        setLoading(true);
+        const response = await fetch(`/api/analytics/metrics?period=${selectedPeriod}`);
         if (!response.ok) {
           throw new Error('Failed to fetch analytics data');
         }
-        const result = await response.json() as AnalyticsData;
-        console.log('Dashboard received data:', result);
-        setData({
-          ...defaultData,
-          ...result,
-          retention: {
-            ...defaultData.retention,
-            ...(result.retention || {})
-          }
-        });
-      } catch (error) {
-        console.error('Failed to fetch analytics:', error);
-        setError(error instanceof Error ? error.message : 'Failed to fetch analytics');
-        setData(defaultData);
+        const analyticsData = (await response.json()) as AnalyticsData;
+        setData(analyticsData);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching analytics:', err);
+        setError('Failed to load analytics data');
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [period]);
+  }, [selectedPeriod]);
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="max-w-lg mx-auto">
-          <div className="text-center">
-            <Title className="text-red-500 mb-2">Error Loading Analytics</Title>
+      <div className="p-4">
+        <Card className="mx-auto max-w-4xl">
+          <div className="text-center p-4">
+            <Title>Error</Title>
             <Text>{error}</Text>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              Retry
-            </button>
           </div>
         </Card>
       </div>
@@ -229,185 +214,132 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-screen-2xl mx-auto p-4 md:p-8 space-y-8">
-        {/* Header */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-            <div>
-              <Title className="text-2xl font-semibold mb-1">Analytics Dashboard</Title>
-              <Text className="text-tremor-content">Track your website&apos;s performance metrics</Text>
-            </div>
-            <div className="flex items-center gap-4">
-              <Badge size="lg" className="bg-blue-50 text-blue-700">
-                {formatNumber(data.retention.total_sessions)} Total Sessions
-              </Badge>
-              <TabGroup defaultValue="7d" onIndexChange={(index) => {
-                const periods = ['24h', '7d', '30d'];
-                const newPeriod = periods[index];
-                setPeriod(newPeriod);
-              }}>
-                <TabList variant="solid" className="w-fit">
-                  <Tab>24h</Tab>
-                  <Tab>7d</Tab>
-                  <Tab>30d</Tab>
-                </TabList>
-              </TabGroup>
-            </div>
-          </div>
-        </div>
+    <main className="p-4 md:p-10 mx-auto max-w-7xl">
+      <div className="flex items-center justify-between mb-4">
+        <Title>Analytics Dashboard</Title>
+        <TabGroup defaultValue={selectedPeriod} onIndexChange={(index) => {
+          const periods = ['24h', '7d', '30d'];
+          setSelectedPeriod(periods[index]);
+        }}>
+          <TabList variant="solid">
+            <Tab>Last 24h</Tab>
+            <Tab>Last 7 days</Tab>
+            <Tab>Last 30 days</Tab>
+          </TabList>
+        </TabGroup>
+      </div>
 
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid gap-6 mb-6">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {loading ? (
-            [...Array(4)].map((_, i) => <LoadingCard key={i} />)
+            <>
+              <LoadingCard />
+              <LoadingCard />
+              <LoadingCard />
+              <LoadingCard />
+            </>
           ) : (
             <>
               <MetricCard
-                title="Bounce Rate"
-                value={formatPercent(data.retention.bounce_rate)}
-                description="Percentage of single-page sessions"
-                color="rose"
-                trend={data.retention.bounce_rate > 50 ? "High" : "Good"}
-              />
-              <MetricCard
-                title="Avg. Session Duration"
-                value={formatDuration(data.retention.avg_session_duration)}
-                description="Time spent per session"
+                title="Total Sessions"
+                value={formatNumber(data?.retention?.total_sessions ?? null)}
+                description="Total number of user sessions"
                 color="blue"
               />
               <MetricCard
-                title="Pages per Session"
-                value={formatNumber(data.retention.avg_pages_per_session)}
-                description="Average pages viewed"
-                color="amber"
+                title="Bounce Rate"
+                value={formatPercent(data?.retention?.bounce_rate ?? null)}
+                description="Percentage of single-page sessions"
+                color="red"
               />
               <MetricCard
-                title="Returning Visitors"
-                value={formatPercent(data.retention.returning_visitor_rate)}
-                description="Percentage of returning users"
+                title="Avg. Session Duration"
+                value={formatDuration(data?.retention?.avg_session_duration ?? null)}
+                description="Average time spent per session"
                 color="emerald"
+              />
+              <MetricCard
+                title="Pages per Session"
+                value={formatNumber(data?.retention?.avg_pages_per_session ?? null)}
+                description="Average pages viewed per session"
+                color="amber"
               />
             </>
           )}
         </div>
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {loading ? (
-            [...Array(4)].map((_, i) => <LoadingChartCard key={i} />)
+            <>
+              <LoadingChartCard />
+              <LoadingChartCard />
+            </>
           ) : (
             <>
-              {/* Page Views Chart */}
               <ChartCard title="Page Views">
-                {data.timeOnPage.length > 0 ? (
+                {data?.timeOnPage && data.timeOnPage.length > 0 ? (
                   <BarChart
                     data={data.timeOnPage}
                     index="page_path"
-                    categories={["views"]}
-                    colors={["blue"]}
+                    categories={['views']}
+                    colors={['blue']}
                     valueFormatter={formatNumber}
                     yAxisWidth={48}
-                    className="h-[300px] mt-4"
                   />
                 ) : (
-                  <div className="h-[300px] flex items-center justify-center text-gray-500">
-                    No page view data available
-                  </div>
+                  <Text className="text-center py-8">No page view data available</Text>
                 )}
               </ChartCard>
 
-              {/* Time on Page Chart */}
               <ChartCard title="Average Time on Page">
-                {data.timeOnPage.length > 0 ? (
+                {data?.timeOnPage && data.timeOnPage.length > 0 ? (
                   <BarChart
                     data={data.timeOnPage}
                     index="page_path"
-                    categories={["avg_time_on_page"]}
-                    colors={["green"]}
+                    categories={['avg_time_on_page']}
+                    colors={['emerald']}
                     valueFormatter={(value) => formatDuration(value)}
                     yAxisWidth={48}
-                    className="h-[300px] mt-4"
                   />
                 ) : (
-                  <div className="h-[300px] flex items-center justify-center text-gray-500">
-                    No time on page data available
-                  </div>
+                  <Text className="text-center py-8">No time on page data available</Text>
                 )}
               </ChartCard>
+            </>
+          )}
+        </div>
 
-              {/* Device Distribution */}
-              <ChartCard title="Device & Browser Distribution">
-                {data.deviceMetrics.length > 0 ? (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {loading ? (
+            <>
+              <LoadingChartCard />
+              <LoadingChartCard />
+            </>
+          ) : (
+            <>
+              <ChartCard title="Device Distribution">
+                {data?.deviceMetrics && data.deviceMetrics.length > 0 ? (
                   <DonutChart
                     data={data.deviceMetrics}
                     category="sessions"
                     index="device"
                     valueFormatter={formatNumber}
-                    colors={["slate", "violet", "indigo", "rose", "cyan", "amber"]}
-                    className="h-[300px] mt-4"
+                    colors={['slate', 'violet', 'indigo', 'rose', 'cyan', 'amber']}
                   />
                 ) : (
-                  <div className="h-[300px] flex items-center justify-center text-gray-500">
-                    No device data available
-                  </div>
+                  <Text className="text-center py-8">No device data available</Text>
                 )}
               </ChartCard>
 
-              {/* Geographic Distribution */}
               <ChartCard title="Geographic Distribution">
-                <div className="h-[300px]">
-                  <MapWithNoSSR data={data.geographicData} />
+                <div className="h-80">
+                  <MapWithNoSSR data={data?.geographicData || []} />
                 </div>
-              </ChartCard>
-
-              {/* Navigation Flow */}
-              <ChartCard title="Navigation Flow">
-                {data.navigationPaths.length > 0 ? (
-                  <BarChart
-                    data={data.navigationPaths}
-                    index="path"
-                    categories={["entry_rate", "exit_rate"]}
-                    colors={["emerald", "rose"]}
-                    valueFormatter={formatPercent}
-                    yAxisWidth={48}
-                    className="h-[300px] mt-4"
-                  />
-                ) : (
-                  <div className="h-[300px] flex items-center justify-center text-gray-500">
-                    No navigation data available
-                  </div>
-                )}
-              </ChartCard>
-
-              {/* Scroll Depth */}
-              <ChartCard title="Scroll Depth">
-                {data.timeOnPage.length > 0 ? (
-                  <div className="space-y-6 mt-4">
-                    {data.timeOnPage.slice(0, 5).map((page) => (
-                      <div key={page.page_path} className="space-y-2">
-                        <div className="flex justify-between">
-                          <Text>{page.page_path}</Text>
-                          <Text>{formatPercent(page.avg_scroll_depth)}</Text>
-                        </div>
-                        <ProgressBar 
-                          value={page.avg_scroll_depth || 0} 
-                          color="blue"
-                          tooltip={`${formatPercent(page.avg_scroll_depth)} average scroll depth`}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="h-[300px] flex items-center justify-center text-gray-500">
-                    No scroll depth data available
-                  </div>
-                )}
               </ChartCard>
             </>
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 } 

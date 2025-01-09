@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
       error,
       url: request.url,
       method: request.method,
-      headers: Object.fromEntries(request.headers),
+      headers: Object.fromEntries(request.headers instanceof Headers ? request.headers.entries() : []),
       env: {
         isDev: process.env.NODE_ENV === 'development',
         isProd: process.env.NODE_ENV === 'production',
