@@ -1,29 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Analytics } from '@/lib/analytics';
-import { MetricsResponse } from '@/types/analytics';
 
 export async function GET(request: NextRequest) {
   try {
     const analytics = new Analytics();
-    const timePeriod = request.headers.get('x-time-period') || '24h';
-
-    const [retention, pages, devices, ctr] = await Promise.all([
-      analytics.getRetentionMetrics(timePeriod),
-      analytics.getPageMetrics(timePeriod),
-      analytics.getDeviceMetrics(timePeriod),
-      analytics.getCTRMetrics(timePeriod),
-    ]);
-
-    const response: MetricsResponse = {
-      retention,
-      pages,
-      devices,
-      ctr,
+    const searchParams = request.nextUrl.searchParams;
+    
+    // Parse timeframe parameters
+    const startTime = searchParams.get('startTime');
+    const endTime = searchParams.get('endTime');
+    
+    const timeframe = {
+      ...(startTime && { startTime: parseInt(startTime) }),
+      ...(endTime && { endTime: parseInt(endTime) })
     };
 
-    return NextResponse.json(response);
+    const metrics = await analytics.getMetrics(
+      Object.keys(timeframe).length > 0 ? timeframe : undefined
+    );
+
+    await analytics.close();
+    return NextResponse.json(metrics);
   } catch (error) {
-    console.error('Error fetching metrics:', error);
+    console.error('Error getting analytics metrics:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

@@ -1,29 +1,22 @@
-'use client';
-
-import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
 import './globals.css';
+import { Analytics } from './analytics-client';
+
+export const metadata = {
+  title: 'Personal Website',
+  description: 'Building at the intersection of technology and creativity',
+};
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-
-  useEffect(() => {
-    // Skip tracking for analytics pages
-    if (pathname?.includes('/analytics')) {
-      return;
-    }
-
-
-
-  }, [pathname]);
-
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className="font-sans antialiased">
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 } 

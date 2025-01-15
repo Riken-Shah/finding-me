@@ -1,127 +1,258 @@
-import { useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { v4 as uuidv4 } from 'uuid';
 
-interface ClickEvent {
-  element: string;
+const SESSION_ID_KEY = 'analytics_session_id';
+const SESSION_START_KEY = 'analytics_session_start';
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+interface TrackEventOptions {
+  element?: string;
   href?: string;
-  x: number;
-  y: number;
-  viewport_width: number;
-  viewport_height: number;
+  scrollDepth?: string;
+  section?: string;
+  timeSpent?: number;
 }
 
-interface ScrollEvent {
-  percent: number;
-  direction: 'up' | 'down';
-  viewport_height: number;
-  document_height: number;
-}
-
-interface EnrichedEventData {
-  timestamp: string;
-  page_path: string;
-  page_title: string;
-  referrer: string;
-  user_agent: string;
-  screen_width: number;
-  screen_height: number;
-  [key: string]: unknown;
-}
-
-interface ClickEventData extends EnrichedEventData {
-  element_type: string;
-  target_url?: string;
-  click_x: number;
-  click_y: number;
-  viewport: {
-    width: number;
-    height: number;
-  };
-}
-
-interface ScrollEventData extends EnrichedEventData {
-  scroll_depth: number;
-  scroll_direction: 'up' | 'down';
-  viewport: {
-    height: number;
-  };
-  document: {
-    height: number;
-  };
-  max_scroll_depth: number;
+interface PerformanceMetrics {
+  ttfb?: number;           // Time to First Byte
+  fcp?: number;           // First Contentful Paint
+  lcp?: number;           // Largest Contentful Paint
+  cls?: number;           // Cumulative Layout Shift
+  fid?: number;           // First Input Delay
 }
 
 export function useAnalytics() {
-  const trackEvent = useCallback(async <T extends EnrichedEventData>(
-    event_name: string,
-    event_data: Omit<T, keyof EnrichedEventData>
-  ) => {
-    try {
-      const enrichedData: T = {
-        ...event_data as T,
-        timestamp: new Date().toISOString(),
-        page_path: window.location.pathname,
-        page_title: document.title,
-        referrer: document.referrer,
-        user_agent: navigator.userAgent,
-        screen_width: window.screen.width,
-        screen_height: window.screen.height
-      } as T;
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const sectionObserver = useRef<IntersectionObserver | null>(null);
+  const sectionTimers = useRef<Record<string, number>>({});
 
-      const response = await fetch(`/api/analytics/track?page=${window.location.pathname}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          event_name,
-          event_data: enrichedData
-        }),
-      });
+  const getSessionId = useCallback(() => {
+    if (typeof window === 'undefined') return null;
 
-      if (!response.ok) {
-        throw new Error('Failed to track event');
+    let sessionId = localStorage.getItem(SESSION_ID_KEY);
+    const lastStart = localStorage.getItem(SESSION_START_KEY);
+
+    // Check if session has expired
+    if (sessionId && lastStart) {
+      const timeSinceLastStart = Date.now() - parseInt(lastStart);
+      if (timeSinceLastStart > SESSION_TIMEOUT) {
+        sessionId = null;
       }
-    } catch (error) {
-      console.error('Analytics error:', error);
     }
+
+    if (!sessionId) {
+      sessionId = uuidv4();
+      localStorage.setItem(SESSION_ID_KEY, sessionId);
+    }
+
+    localStorage.setItem(SESSION_START_KEY, Date.now().toString());
+    return sessionId;
   }, []);
 
-  const trackClick = useCallback((data: ClickEvent) => {
-    const clickData: Omit<ClickEventData, keyof EnrichedEventData> = {
-      element_type: data.element,
-      target_url: data.href,
-      click_x: data.x,
-      click_y: data.y,
-      viewport: {
-        width: data.viewport_width,
-        height: data.viewport_height
+  const track = useCallback(async (options: TrackEventOptions = {}) => {
+    const sessionId = getSessionId();
+    if (!sessionId) return;
+
+    const headers = new Headers({
+      'x-session-id': sessionId,
+    });
+
+    if (options.element) headers.set('x-element', options.element);
+    if (options.href) headers.set('x-href', options.href);
+    if (options.scrollDepth) headers.set('x-scroll-depth', options.scrollDepth);
+
+    try {
+      await fetch('/api/analytics/tracking', { headers });
+    } catch (error) {
+      console.error('Error tracking analytics:', error);
+    }
+  }, [getSessionId]);
+
+  const trackPageView = useCallback(async () => {
+    const sessionId = getSessionId();
+    if (!sessionId) return;
+
+    const headers = new Headers({
+      'x-session-id': sessionId,
+      'x-page': pathname || '/',
+      'x-event': 'pageview'
+    });
+
+    try {
+      await fetch('/api/analytics/tracking', { headers });
+    } catch (error) {
+      console.error('Error tracking page view:', error);
+    }
+  }, [getSessionId, pathname]);
+
+  const trackEvent = useCallback(async (event: string, options: TrackEventOptions = {}) => {
+    const sessionId = getSessionId();
+    if (!sessionId) return;
+
+    const headers = new Headers({
+      'x-session-id': sessionId,
+      'x-event': event,
+    });
+
+    if (options.element) headers.set('x-element', options.element);
+    if (options.href) headers.set('x-href', options.href);
+
+    try {
+      await fetch('/api/analytics/tracking', { headers });
+    } catch (error) {
+      console.error('Error tracking event:', error);
+    }
+  }, [getSessionId]);
+
+  const trackScroll = useCallback(async (depth: number) => {
+    await track({ scrollDepth: depth.toString() });
+  }, [track]);
+
+  const trackPerformance = useCallback(async () => {
+    const metrics: PerformanceMetrics = {};
+    
+    // Get navigation timing metrics
+    const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+    if (navigation) {
+      metrics.ttfb = navigation.responseStart - navigation.requestStart;
+    }
+
+    // First Contentful Paint
+    const paint = performance.getEntriesByType('paint');
+    const fcp = paint.find(entry => entry.name === 'first-contentful-paint');
+    if (fcp) {
+      metrics.fcp = fcp.startTime;
+    }
+
+    // Largest Contentful Paint
+    new PerformanceObserver((entryList) => {
+      const entries = entryList.getEntries();
+      const lastEntry = entries[entries.length - 1];
+      metrics.lcp = lastEntry.startTime;
+      track({ event: 'performance', ...metrics });
+    }).observe({ entryTypes: ['largest-contentful-paint'] });
+
+    // Cumulative Layout Shift
+    new PerformanceObserver((entryList) => {
+      let cumulativeScore = 0;
+      for (const entry of entryList.getEntries()) {
+        if (!(entry as any).hadRecentInput) {
+          cumulativeScore += (entry as any).value;
+        }
+      }
+      metrics.cls = cumulativeScore;
+      track({ event: 'performance', ...metrics });
+    }).observe({ entryTypes: ['layout-shift'] });
+
+    // First Input Delay
+    new PerformanceObserver((entryList) => {
+      const firstInput = entryList.getEntries()[0];
+      metrics.fid = firstInput.processingStart - firstInput.startTime;
+      track({ event: 'performance', ...metrics });
+    }).observe({ entryTypes: ['first-input'] });
+  }, []);
+
+  const initSectionTracking = useCallback(() => {
+    // Cleanup previous observer
+    if (sectionObserver.current) {
+      sectionObserver.current.disconnect();
+    }
+
+    sectionObserver.current = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          const sectionId = entry.target.id;
+          if (!sectionId) return;
+
+          if (entry.isIntersecting) {
+            // Section came into view
+            sectionTimers.current[sectionId] = Date.now();
+          } else if (sectionTimers.current[sectionId]) {
+            // Section went out of view - track time spent
+            const timeSpent = Date.now() - sectionTimers.current[sectionId];
+            track({
+              event: 'section_view',
+              section: sectionId,
+              timeSpent
+            });
+            delete sectionTimers.current[sectionId];
+          }
+        });
+      },
+      {
+        threshold: 0.5 // 50% visibility
+      }
+    );
+
+    // Observe all sections
+    document.querySelectorAll('[data-section]').forEach(section => {
+      sectionObserver.current?.observe(section);
+    });
+  }, [track]);
+
+  // Track page views
+  useEffect(() => {
+    const sessionId = getSessionId();
+    if (!sessionId) return;
+
+    // Start session
+    trackEvent('session_start');
+
+    // Track initial page view
+    trackPageView();
+
+    // Track scroll depth
+    const handleScroll = () => {
+      const docHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+      const scrollTop = document.documentElement.scrollTop;
+      const scrollPercentage = Math.round((scrollTop / docHeight) * 100);
+      
+      // Track at 25%, 50%, 75%, and 100%
+      if (scrollPercentage >= 25 && scrollPercentage < 50) {
+        trackScroll(25);
+      } else if (scrollPercentage >= 50 && scrollPercentage < 75) {
+        trackScroll(50);
+      } else if (scrollPercentage >= 75 && scrollPercentage < 100) {
+        trackScroll(75);
+      } else if (scrollPercentage === 100) {
+        trackScroll(100);
       }
     };
-    trackEvent<ClickEventData>('click', clickData);
-  }, [trackEvent]);
 
-  const trackScroll = useCallback((data: ScrollEvent) => {
-    const maxScrollDepth = Math.max(
-      Number(sessionStorage.getItem('max_scroll_depth') || '0'),
-      data.percent
-    );
-    const scrollData: Omit<ScrollEventData, keyof EnrichedEventData> = {
-      scroll_depth: data.percent,
-      scroll_direction: data.direction,
-      viewport: {
-        height: data.viewport_height
-      },
-      document: {
-        height: data.document_height
-      },
-      max_scroll_depth: maxScrollDepth
+    window.addEventListener('scroll', handleScroll);
+
+    // End session when user leaves
+    const handleBeforeUnload = () => {
+      trackEvent('session_end');
     };
-    sessionStorage.setItem('max_scroll_depth', maxScrollDepth.toString());
-    trackEvent<ScrollEventData>('scroll', scrollData);
-  }, [trackEvent]);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [getSessionId, trackEvent, trackPageView, trackScroll]);
+
+  useEffect(() => {
+    // Track page load performance
+    trackPerformance();
+    
+    // Initialize section tracking
+    initSectionTracking();
+
+    // Cleanup
+    return () => {
+      if (sectionObserver.current) {
+        sectionObserver.current.disconnect();
+      }
+    };
+  }, [pathname]);
 
   return {
-    trackClick,
+    trackEvent,
+    trackPageView,
     trackScroll
   };
 } 
