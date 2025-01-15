@@ -127,19 +127,19 @@ describe('Analytics', () => {
     const baseTime = Date.now();
     
     beforeEach(() => {
-      // Mock metrics data
+      // Reset all mocks before each test
+      jest.clearAllMocks();
+    });
+
+    it('should calculate metrics for all time', async () => {
+      // Setup mocks for this test
       mockDb.first
-        // Mock visitors count
         .mockResolvedValueOnce({ count: 4 })
-        // Mock bounce rate
         .mockResolvedValueOnce({ bounce_rate: 50 })
-        // Mock avg time spent
         .mockResolvedValueOnce({ avg_time: 120 })
-        // Mock conversion rate
         .mockResolvedValueOnce({ conversion_rate: 25 });
 
       mockDb.all
-        // Mock top pages
         .mockResolvedValueOnce({ 
           results: [
             { page: '/home', views: 10 },
@@ -148,7 +148,6 @@ describe('Analytics', () => {
           success: true,
           meta: mockD1Meta
         })
-        // Mock click through rates
         .mockResolvedValueOnce({ 
           results: [
             { element: 'signup-button', clicks: 5, ctr: 25 }
@@ -156,7 +155,6 @@ describe('Analytics', () => {
           success: true,
           meta: mockD1Meta
         })
-        // Mock device breakdown
         .mockResolvedValueOnce({ 
           results: [
             { device_type: 'desktop', count: 2 },
@@ -167,7 +165,6 @@ describe('Analytics', () => {
           success: true,
           meta: mockD1Meta
         })
-        // Mock country breakdown
         .mockResolvedValueOnce({ 
           results: [
             { country: 'US', count: 2 },
@@ -176,9 +173,7 @@ describe('Analytics', () => {
           success: true,
           meta: mockD1Meta
         });
-    });
 
-    it('should calculate metrics for all time', async () => {
       const metrics = await analytics.getMetrics();
 
       expect(metrics.totalVisitors).toBe(4);
@@ -196,6 +191,48 @@ describe('Analytics', () => {
     });
 
     it('should calculate metrics for specific timeframe', async () => {
+      // Setup mocks for this test
+      mockDb.first
+        .mockResolvedValueOnce({ count: 4 })
+        .mockResolvedValueOnce({ bounce_rate: 50 })
+        .mockResolvedValueOnce({ avg_time: 120 })
+        .mockResolvedValueOnce({ conversion_rate: 25 });
+
+      mockDb.all
+        .mockResolvedValueOnce({ 
+          results: [
+            { page: '/home', views: 10 },
+            { page: '/about', views: 5 }
+          ],
+          success: true,
+          meta: mockD1Meta
+        })
+        .mockResolvedValueOnce({ 
+          results: [
+            { element: 'signup-button', clicks: 5, ctr: 25 }
+          ],
+          success: true,
+          meta: mockD1Meta
+        })
+        .mockResolvedValueOnce({ 
+          results: [
+            { device_type: 'desktop', count: 2 },
+            { device_type: 'mobile', count: 1 },
+            { device_type: 'tablet', count: 1 },
+            { device_type: 'unknown', count: 1 }
+          ],
+          success: true,
+          meta: mockD1Meta
+        })
+        .mockResolvedValueOnce({ 
+          results: [
+            { country: 'US', count: 2 },
+            { country: 'UK', count: 2 }
+          ],
+          success: true,
+          meta: mockD1Meta
+        });
+
       const metrics = await analytics.getMetrics({
         startTime: baseTime - (12 * 60 * 60 * 1000), // Last 12 hours
         endTime: baseTime
@@ -205,6 +242,123 @@ describe('Analytics', () => {
       expect(metrics.topPages).toHaveLength(2);
       expect(metrics.deviceBreakdown).toHaveLength(4);
       expect(metrics.countryBreakdown).toHaveLength(2);
+    });
+
+    describe('Bounce Rate', () => {
+      it('should calculate bounce rate correctly', async () => {
+        // Mock data for bounce rate calculation
+        mockDb.first
+          .mockResolvedValueOnce({ count: 10 }) // Total visitors
+          .mockResolvedValueOnce({ bounce_rate: 40 }) // 40% bounce rate
+          .mockResolvedValueOnce({ avg_time: 0 }) // Not used in this test
+          .mockResolvedValueOnce({ conversion_rate: 0 }); // Not used in this test
+
+        mockDb.all
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // top pages
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // ctr
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // devices
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }); // countries
+
+        const metrics = await analytics.getMetrics();
+        expect(metrics.bounceRate).toBe(40);
+        expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('WITH session_page_counts'));
+      });
+
+      it('should handle zero visitors for bounce rate', async () => {
+        // Mock data for bounce rate calculation with no visitors
+        mockDb.first
+          .mockResolvedValueOnce({ count: 0 }) // No visitors
+          .mockResolvedValueOnce({ bounce_rate: 0 }) // 0% bounce rate
+          .mockResolvedValueOnce({ avg_time: 0 }) // Not used in this test
+          .mockResolvedValueOnce({ conversion_rate: 0 }); // Not used in this test
+
+        mockDb.all
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // top pages
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // ctr
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // devices
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }); // countries
+
+        const metrics = await analytics.getMetrics();
+        expect(metrics.bounceRate).toBe(0);
+      });
+    });
+
+    describe('Average Time Spent', () => {
+      it('should calculate average time spent correctly', async () => {
+        // Mock data for average time spent calculation
+        mockDb.first
+          .mockResolvedValueOnce({ count: 5 }) // Total visitors
+          .mockResolvedValueOnce({ bounce_rate: 0 }) // Not used in this test
+          .mockResolvedValueOnce({ avg_time: 180 }) // 3 minutes average
+          .mockResolvedValueOnce({ conversion_rate: 0 }); // Not used in this test
+
+        mockDb.all
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // top pages
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // ctr
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // devices
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }); // countries
+
+        const metrics = await analytics.getMetrics();
+        expect(metrics.avgTimeSpentSeconds).toBe(180);
+        expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('SELECT AVG(time_spent)'));
+      });
+
+      it('should handle sessions with only one pageview', async () => {
+        // Mock data for average time calculation with single pageview sessions
+        mockDb.first
+          .mockResolvedValueOnce({ count: 3 }) // Total visitors
+          .mockResolvedValueOnce({ bounce_rate: 0 }) // Not used in this test
+          .mockResolvedValueOnce({ avg_time: 0 }) // 0 seconds for single pageview sessions
+          .mockResolvedValueOnce({ conversion_rate: 0 }); // Not used in this test
+
+        mockDb.all
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // top pages
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // ctr
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // devices
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }); // countries
+
+        const metrics = await analytics.getMetrics();
+        expect(metrics.avgTimeSpentSeconds).toBe(0);
+      });
+    });
+
+    describe('Conversion Rate', () => {
+      it('should calculate conversion rate correctly', async () => {
+        // Mock data for conversion rate calculation
+        mockDb.first
+          .mockResolvedValueOnce({ count: 100 }) // Total visitors
+          .mockResolvedValueOnce({ bounce_rate: 0 }) // Not used in this test
+          .mockResolvedValueOnce({ avg_time: 0 }) // Not used in this test
+          .mockResolvedValueOnce({ conversion_rate: 15.5 }); // 15.5% conversion rate
+
+        mockDb.all
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // top pages
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // ctr
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // devices
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }); // countries
+
+        const metrics = await analytics.getMetrics();
+        expect(metrics.conversionRate).toBe(15.5);
+        expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('event_name = \'conversion\''));
+      });
+
+      it('should handle zero visitors for conversion rate', async () => {
+        // Mock data for conversion rate calculation with no visitors
+        mockDb.first
+          .mockResolvedValueOnce({ count: 0 }) // No visitors
+          .mockResolvedValueOnce({ bounce_rate: 0 }) // Not used in this test
+          .mockResolvedValueOnce({ avg_time: 0 }) // Not used in this test
+          .mockResolvedValueOnce({ conversion_rate: 0 }); // 0% conversion rate
+
+        mockDb.all
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // top pages
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // ctr
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }) // devices
+          .mockResolvedValueOnce({ results: [], success: true, meta: mockD1Meta }); // countries
+
+        const metrics = await analytics.getMetrics();
+        expect(metrics.conversionRate).toBe(0);
+      });
     });
   });
 }); 
