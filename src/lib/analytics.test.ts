@@ -1,14 +1,6 @@
 import { Analytics, TrackingData } from './analytics-d1';
 import { D1Database, D1Result } from '@cloudflare/workers-types';
-
-// Create a type that combines D1Database with Jest mock methods
-type MockD1Database = {
-  prepare: jest.Mock<D1PreparedStatement>;
-  bind: jest.Mock;
-  first: jest.Mock;
-  all: jest.Mock;
-  run: jest.Mock;
-};
+import { jest } from '@jest/globals';
 
 type D1PreparedStatement = {
   bind: (...args: any[]) => D1PreparedStatement;
@@ -17,13 +9,32 @@ type D1PreparedStatement = {
   run: () => Promise<D1Result>;
 };
 
+// Create a type that combines D1Database with Jest mock methods
+type MockD1Database = {
+  prepare: jest.Mock<() => D1PreparedStatement>;
+  bind: jest.Mock<() => D1PreparedStatement>;
+  first: jest.Mock<() => Promise<any>>;
+  all: jest.Mock<() => Promise<D1Result<any>>>;
+  run: jest.Mock<() => Promise<D1Result>>;
+};
+
+const mockD1Meta = {
+  duration: 0,
+  size_after: 0,
+  rows_read: 0,
+  rows_written: 0,
+  last_row_id: 0,
+  changed_db: false,
+  changes: 0
+};
+
 // Mock D1 database
 const mockDb: MockD1Database = {
-  prepare: jest.fn().mockReturnThis(),
-  bind: jest.fn().mockReturnThis(),
-  first: jest.fn(),
-  all: jest.fn().mockReturnValue({ results: [] }),
-  run: jest.fn().mockResolvedValue({ success: true }),
+  prepare: jest.fn<() => D1PreparedStatement>().mockReturnThis(),
+  bind: jest.fn<() => D1PreparedStatement>().mockReturnThis(),
+  first: jest.fn<() => Promise<any>>(),
+  all: jest.fn<() => Promise<D1Result<any>>>().mockResolvedValue({ results: [], success: true, meta: mockD1Meta }),
+  run: jest.fn<() => Promise<D1Result>>().mockResolvedValue({ success: true, meta: mockD1Meta, results: [] }),
 };
 
 describe('Analytics', () => {
@@ -129,26 +140,42 @@ describe('Analytics', () => {
 
       mockDb.all
         // Mock top pages
-        .mockResolvedValueOnce({ results: [
-          { page: '/home', views: 10 },
-          { page: '/about', views: 5 }
-        ]})
+        .mockResolvedValueOnce({ 
+          results: [
+            { page: '/home', views: 10 },
+            { page: '/about', views: 5 }
+          ],
+          success: true,
+          meta: mockD1Meta
+        })
         // Mock click through rates
-        .mockResolvedValueOnce({ results: [
-          { element: 'signup-button', clicks: 5, ctr: 25 }
-        ]})
+        .mockResolvedValueOnce({ 
+          results: [
+            { element: 'signup-button', clicks: 5, ctr: 25 }
+          ],
+          success: true,
+          meta: mockD1Meta
+        })
         // Mock device breakdown
-        .mockResolvedValueOnce({ results: [
-          { device_type: 'desktop', count: 2 },
-          { device_type: 'mobile', count: 1 },
-          { device_type: 'tablet', count: 1 },
-          { device_type: 'unknown', count: 1 }
-        ]})
+        .mockResolvedValueOnce({ 
+          results: [
+            { device_type: 'desktop', count: 2 },
+            { device_type: 'mobile', count: 1 },
+            { device_type: 'tablet', count: 1 },
+            { device_type: 'unknown', count: 1 }
+          ],
+          success: true,
+          meta: mockD1Meta
+        })
         // Mock country breakdown
-        .mockResolvedValueOnce({ results: [
-          { country: 'US', count: 2 },
-          { country: 'UK', count: 2 }
-        ]});
+        .mockResolvedValueOnce({ 
+          results: [
+            { country: 'US', count: 2 },
+            { country: 'UK', count: 2 }
+          ],
+          success: true,
+          meta: mockD1Meta
+        });
     });
 
     it('should calculate metrics for all time', async () => {
