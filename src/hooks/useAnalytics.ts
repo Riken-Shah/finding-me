@@ -12,6 +12,7 @@ interface TrackEventOptions {
   scrollDepth?: string;
   section?: string;
   timeSpent?: number;
+  event?: string;
 }
 
 interface PerformanceMetrics {
@@ -148,7 +149,7 @@ export function useAnalytics() {
 
     // First Input Delay
     new PerformanceObserver((entryList) => {
-      const firstInput = entryList.getEntries()[0];
+      const firstInput = entryList.getEntries()[0] as PerformanceEventTiming;
       metrics.fid = firstInput.processingStart - firstInput.startTime;
       track({ event: 'performance', ...metrics });
     }).observe({ entryTypes: ['first-input'] });

@@ -55,7 +55,7 @@ export default function AnalyticsDashboard() {
           throw new Error('Failed to fetch metrics');
         }
 
-        const data = await response.json();
+        const data = await response.json() as AnalyticsMetrics;
         setMetrics(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');

@@ -97,14 +97,14 @@ export class Analytics {
           .bind(
             data.sessionId,
             timestamp,
-            data.userAgent,
-            data.ipAddress,
-            data.referrer,
-            data.deviceType,
-            data.country,
-            data.city,
-            data.latitude,
-            data.longitude
+            data.userAgent || null,
+            data.ipAddress || null,
+            data.referrer || null,
+            data.deviceType || null,
+            data.country || null,
+            data.city || null,
+            data.latitude || null,
+            data.longitude || null
           )
           .run();
       }
@@ -135,11 +135,11 @@ export class Analytics {
           data.page,
           timestamp,
           data.scrollDepth ? parseInt(data.scrollDepth) : null,
-          data.ttfb,
-          data.fcp,
-          data.lcp,
-          data.cls,
-          data.fid
+          data.ttfb || null,
+          data.fcp || null,
+          data.lcp || null,
+          data.cls || null,
+          data.fid || null
         )
         .run();
     }
@@ -156,8 +156,8 @@ export class Analytics {
         .bind(
           data.sessionId,
           data.event,
-          data.element,
-          data.href,
+          data.element || null,
+          data.href || null,
           timestamp
         )
         .run();

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Analytics } from '@/lib/analytics-d1';
 import { headers } from 'next/headers';
+import { getD1Database } from '@/lib/database';
 
 export const runtime = 'edge';
 export const preferredRegion = 'auto';
@@ -9,28 +10,15 @@ interface RouteContext {
   params: { [key: string]: string | string[] };
 }
 
-// Helper to get D1 database instance
-function getD1Database(context: any) {
-  // For production (Cloudflare Pages)
-  if (context?.env?.DB) {
-    return context.env.DB;
-  }
-  
-  // For development (Next.js dev server)
-  if (process.env.NODE_ENV === 'development') {
-    // @ts-expect-error - D1 binding
-    return global.DB;
-  }
-  
-  throw new Error('D1 database not available');
-}
-
 export async function GET(
   request: NextRequest,
   context: RouteContext & { env?: { DB: D1Database } }
 ) {
   try {
-    const db = getD1Database(context);
+    const db = await getD1Database(context);
+    if (!db) {
+      throw new Error('Failed to initialize database');
+    }
     const analytics = new Analytics(db);
     const userAgent = request.headers.get('user-agent') || undefined;
     const referer = request.headers.get('referer') || undefined;

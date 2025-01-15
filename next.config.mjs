@@ -1,8 +1,16 @@
+import { setupDevPlatform } from '@cloudflare/next-on-pages/next-dev';
+
+// Setup dev platform
+if (process.env.NODE_ENV === 'development') {
+  (async () => { await setupDevPlatform(); })();
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
     serverActions: true,
   },
+  output: 'standalone',
   async headers() {
     return [
       {
@@ -18,4 +26,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig; 
+export default nextConfig; 
