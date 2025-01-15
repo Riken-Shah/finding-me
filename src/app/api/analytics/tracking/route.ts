@@ -1,10 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Analytics } from '@/lib/analytics';
+import { Analytics } from '@/lib/analytics-d1';
 import { headers } from 'next/headers';
 
-export async function GET(request: NextRequest) {
+export const runtime = 'edge';
+export const preferredRegion = 'auto';
+
+interface RouteContext {
+  params: { [key: string]: string | string[] };
+}
+
+// Helper to get D1 database instance
+function getD1Database(context: any) {
+  // For production (Cloudflare Pages)
+  if (context?.env?.DB) {
+    return context.env.DB;
+  }
+  
+  // For development (Next.js dev server)
+  if (process.env.NODE_ENV === 'development') {
+    // @ts-expect-error - D1 binding
+    return global.DB;
+  }
+  
+  throw new Error('D1 database not available');
+}
+
+export async function GET(
+  request: NextRequest,
+  context: RouteContext & { env?: { DB: D1Database } }
+) {
   try {
-    const analytics = new Analytics();
+    const db = getD1Database(context);
+    const analytics = new Analytics(db);
     const userAgent = request.headers.get('user-agent') || undefined;
     const referer = request.headers.get('referer') || undefined;
     const forwardedFor = request.headers.get('x-forwarded-for');
@@ -48,7 +75,6 @@ export async function GET(request: NextRequest) {
         parseFloat(request.headers.get('x-fid')!) : undefined
     });
 
-    await analytics.close();
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof Error) {

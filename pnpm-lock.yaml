@@ -52,6 +52,9 @@ dependencies:
     version: 11.0.5
 
 devDependencies:
+  '@cloudflare/workers-types':
+    specifier: ^4.20250109.0
+    version: 4.20250109.0
   '@types/better-sqlite3':
     specifier: ^7.6.4
     version: 7.6.12
@@ -382,6 +385,10 @@ packages:
 
   /@bcoe/v8-coverage@0.2.3:
     resolution: {integrity: sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==}
+    dev: true
+
+  /@cloudflare/workers-types@4.20250109.0:
+    resolution: {integrity: sha512-Y1zgSaEOOevl9ORpzgMcm4j535p3nK2lrblHHvYM2yxR50SBKGh+wvkRFAIxWRfjUGZEU+Fp6923EGioDBbobA==}
     dev: true
 
   /@eslint-community/eslint-utils@4.4.1(eslint@8.48.0):

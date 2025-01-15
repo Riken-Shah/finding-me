@@ -6,19 +6,19 @@ pages_build_output_dir = ".vercel/output/static"
 # Preview environment (used for development and preview deployments)
 [[d1_databases]]
 binding = "DB"
-database_name = "website-analytics-dev"
-database_id = "1b1e0384-e617-4b2d-b8a4-4baf966c9148"
+database_name = "analytics-db"
+database_id = "a6a0b776-e0da-40f7-b955-c966bf2ac02e"
 
 [env.preview]
 [[env.preview.d1_databases]]
 binding = "DB"
-database_name = "website-analytics-dev"
-database_id = "1b1e0384-e617-4b2d-b8a4-4baf966c9148"
+database_name = "analytics-db"
+database_id = "a6a0b776-e0da-40f7-b955-c966bf2ac02e"
 
 # Production environment
 [env.production]
 [[env.production.d1_databases]]
 binding = "DB"
-database_name = "website-analytics"
-database_id = "cb6b2d7a-c0c1-44de-8483-dd2a8ceb38e8"
+database_name = "analytics-db"
+database_id = "a6a0b776-e0da-40f7-b955-c966bf2ac02e"
 migrations_dir = "migrations"

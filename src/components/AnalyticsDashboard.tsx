@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AnalyticsMetrics } from '@/lib/analytics';
+import { AnalyticsMetrics } from '@/lib/analytics-d1';
 
 interface TimeframeOption {
   label: string;
