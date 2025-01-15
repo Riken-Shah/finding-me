@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Analytics } from '@/lib/analytics';
 import { headers } from 'next/headers';
-import { getGeoData } from '@/lib/geoip';
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,8 +10,11 @@ export async function GET(request: NextRequest) {
     const forwardedFor = request.headers.get('x-forwarded-for');
     const ip = forwardedFor?.split(',')[0].trim() || request.ip || 'unknown';
     
-    // Get GeoIP data
-    const geoData = await getGeoData(ip);
+    // Get geolocation data from Cloudflare headers
+    const country = request.headers.get('cf-ipcountry') || 'Unknown';
+    const city = request.headers.get('cf-ipcity') || 'Unknown';
+    const latitude = request.headers.get('cf-iplatitude');
+    const longitude = request.headers.get('cf-iplongitude');
 
     const result = await analytics.handleTracking({
       sessionId: request.headers.get('x-session-id'),
@@ -27,10 +29,10 @@ export async function GET(request: NextRequest) {
       timestamp: Date.now(),
       userAgent,
       ipAddress: ip,
-      country: geoData.country,
-      city: geoData.city,
-      latitude: geoData.latitude,
-      longitude: geoData.longitude,
+      country,
+      city,
+      latitude: latitude ? parseFloat(latitude) : undefined,
+      longitude: longitude ? parseFloat(longitude) : undefined,
       referrer: referer,
       deviceType: request.headers.get('x-device-type') || detectDeviceType(userAgent),
       // Performance metrics

@@ -192,6 +192,36 @@ export function useAnalytics() {
     });
   }, [track]);
 
+  const trackClick = useCallback(async ({ element, href, x, y, viewport_width, viewport_height }: {
+    element?: string;
+    href?: string;
+    x?: number;
+    y?: number;
+    viewport_width?: number;
+    viewport_height?: number;
+  }) => {
+    const sessionId = getSessionId();
+    if (!sessionId) return;
+
+    const headers = new Headers({
+      'x-session-id': sessionId,
+      'x-event': 'click',
+    });
+
+    if (element) headers.set('x-element', element);
+    if (href) headers.set('x-href', href);
+    if (x !== undefined) headers.set('x-click-x', x.toString());
+    if (y !== undefined) headers.set('x-click-y', y.toString());
+    if (viewport_width !== undefined) headers.set('x-viewport-width', viewport_width.toString());
+    if (viewport_height !== undefined) headers.set('x-viewport-height', viewport_height.toString());
+
+    try {
+      await fetch('/api/analytics/tracking', { headers });
+    } catch (error) {
+      console.error('Error tracking click:', error);
+    }
+  }, [getSessionId]);
+
   // Track page views
   useEffect(() => {
     const sessionId = getSessionId();
@@ -253,6 +283,7 @@ export function useAnalytics() {
   return {
     trackEvent,
     trackPageView,
-    trackScroll
+    trackScroll,
+    trackClick
   };
 } 
