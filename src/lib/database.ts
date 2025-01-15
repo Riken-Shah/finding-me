@@ -8,5 +8,9 @@ export async function getD1Database(context: any) {
   }
   
   // For development (Next.js dev server)
+  if (process.env.DB) {
     return process.env.DB;
+  }
+
+  throw new Error('Database binding not found. Make sure the DB binding is configured in Cloudflare Pages.');
 } 
