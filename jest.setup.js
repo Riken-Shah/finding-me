@@ -1,14 +1,39 @@
-// Mock D1 types
-global.D1Database = class {
-  prepare() { return this; }
-  bind() { return this; }
-  first() { return null; }
-  all() { return []; }
-  run() { return { success: true }; }
-};
+// Add custom jest matchers
+require('@testing-library/jest-dom');
 
-// Mock process.env
-process.env = {
-  ...process.env,
-  DB: new global.D1Database(),
-}; 
+// Mock window.matchMedia
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: jest.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: jest.fn(),
+    removeListener: jest.fn(),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  })),
+});
+
+// Mock IntersectionObserver
+class MockIntersectionObserver {
+  constructor(callback) {
+    this.callback = callback;
+  }
+
+  observe(element) {
+    this.callback([
+      {
+        isIntersecting: true,
+        target: element,
+        intersectionRatio: 1,
+      },
+    ]);
+  }
+
+  unobserve() {}
+  disconnect() {}
+}
+
+global.IntersectionObserver = MockIntersectionObserver; 
