@@ -17,6 +17,26 @@ async function main() {
 
     const deploymentDuration = parseInt(deployTime) - parseInt(buildTime);
 
+    // Create table if not exists
+    const createTableQuery = `
+      CREATE TABLE IF NOT EXISTS deployment_metrics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        deploy_time INTEGER NOT NULL,
+        build_time INTEGER NOT NULL,
+        deployment_duration INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        environment TEXT NOT NULL,
+        commit_sha TEXT NOT NULL,
+        branch TEXT NOT NULL,
+        metrics_start_time INTEGER NOT NULL,
+        metrics_end_time INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    // Execute create table query
+    execSync(`wrangler d1 execute analytics-db --remote --command "${createTableQuery}"`, { stdio: 'inherit' });
+
     // Insert deployment metrics
     const insertQuery = `
       INSERT INTO deployment_metrics (
@@ -42,8 +62,8 @@ async function main() {
       );
     `;
 
-    // Execute the insert query
-    execSync(`wrangler d1 execute analytics-db --command "${insertQuery}"`, { stdio: 'inherit' });
+    // Execute the insert query with --remote flag
+    execSync(`wrangler d1 execute analytics-db --remote --command "${insertQuery}"`, { stdio: 'inherit' });
 
     console.log('::group::Deployment Metrics');
     console.log(`Deploy Time: ${deployTime}`);
