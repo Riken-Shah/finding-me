@@ -61,15 +61,17 @@ async function main() {
     const analyticsQuery = `
       WITH session_metrics AS (
         SELECT 
-          COUNT(DISTINCT s.session_id) as total_visitors,
+          COUNT(DISTINCT pv.session_id) as total_visitors,
           ROUND(
             CAST(
               SUM(CASE WHEN (
                 SELECT COUNT(*) 
                 FROM page_views pv2 
-                WHERE pv2.session_id = s.session_id
+                WHERE pv2.session_id = pv.session_id
+                AND pv2.timestamp >= ${currentStart}
+                AND pv2.timestamp <= ${currentEnd}
               ) = 1 THEN 1 ELSE 0 END) AS FLOAT
-            ) / COUNT(DISTINCT s.session_id) * 100,
+            ) / NULLIF(COUNT(DISTINCT pv.session_id), 0) * 100,
             2
           ) as bounce_rate,
           ROUND(
@@ -78,28 +80,39 @@ async function main() {
                 WHEN (
                   SELECT COUNT(*) 
                   FROM page_views pv3 
-                  WHERE pv3.session_id = s.session_id
+                  WHERE pv3.session_id = pv.session_id
+                  AND pv3.timestamp >= ${currentStart}
+                  AND pv3.timestamp <= ${currentEnd}
                 ) > 1 
-                THEN (
-                  SELECT MAX(timestamp) - MIN(timestamp)
-                  FROM page_views pv4
-                  WHERE pv4.session_id = s.session_id
+                THEN COALESCE(
+                  (
+                    SELECT MAX(time_spent)
+                    FROM page_views pv4
+                    WHERE pv4.session_id = pv.session_id
+                    AND pv4.timestamp >= ${currentStart}
+                    AND pv4.timestamp <= ${currentEnd}
+                  ), 0
                 )
                 ELSE 0 
               END
-            ) / 1000,
+            ),
             2
           ) as avg_time_spent_seconds,
           ROUND(
             CAST(
-              COUNT(DISTINCT CASE WHEN e.event_name = 'conversion' THEN s.session_id END) AS FLOAT
-            ) / NULLIF(COUNT(DISTINCT s.session_id), 0) * 100,
+              COUNT(DISTINCT CASE 
+                WHEN e.event_name = 'conversion' 
+                AND e.timestamp >= ${currentStart}
+                AND e.timestamp <= ${currentEnd}
+                THEN pv.session_id 
+              END) AS FLOAT
+            ) / NULLIF(COUNT(DISTINCT pv.session_id), 0) * 100,
             2
           ) as conversion_rate
-        FROM sessions s
-        LEFT JOIN events e ON e.session_id = s.session_id
-        WHERE s.start_time >= ${currentStart} 
-        AND s.start_time <= ${currentEnd}
+        FROM page_views pv
+        LEFT JOIN events e ON e.session_id = pv.session_id
+        WHERE pv.timestamp >= ${currentStart} 
+        AND pv.timestamp <= ${currentEnd}
       )
       SELECT 
         total_visitors,
