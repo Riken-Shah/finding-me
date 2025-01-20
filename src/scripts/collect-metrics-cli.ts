@@ -17,8 +17,8 @@ async function main() {
 
     const deploymentDuration = parseInt(deployTime) - parseInt(buildTime);
 
-    // Create table if not exists
-    const createTableQuery = `
+    // Create deployment metrics table if not exists
+    const createDeploymentTableQuery = `
       CREATE TABLE IF NOT EXISTS deployment_metrics (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         deploy_time INTEGER NOT NULL,
@@ -30,14 +30,80 @@ async function main() {
         branch TEXT NOT NULL,
         metrics_start_time INTEGER NOT NULL,
         metrics_end_time INTEGER NOT NULL,
+        bounce_rate REAL,
+        avg_time_spent_seconds REAL,
+        total_visitors INTEGER,
+        conversion_rate REAL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `;
 
     // Execute create table query
-    execSync(`wrangler d1 execute analytics-db --remote --command "${createTableQuery}"`, { stdio: 'inherit' });
+    execSync(`wrangler d1 execute analytics-db --remote --command "${createDeploymentTableQuery}"`, { stdio: 'inherit' });
 
-    // Insert deployment metrics
+    // Get analytics metrics for the deployment timeframe
+    const analyticsQuery = `
+      WITH session_metrics AS (
+        SELECT 
+          COUNT(DISTINCT s.session_id) as total_visitors,
+          ROUND(
+            CAST(
+              SUM(CASE WHEN (
+                SELECT COUNT(*) 
+                FROM page_views pv2 
+                WHERE pv2.session_id = s.session_id
+              ) = 1 THEN 1 ELSE 0 END) AS FLOAT
+            ) / COUNT(DISTINCT s.session_id) * 100,
+            2
+          ) as bounce_rate,
+          ROUND(
+            AVG(
+              CASE 
+                WHEN (
+                  SELECT COUNT(*) 
+                  FROM page_views pv3 
+                  WHERE pv3.session_id = s.session_id
+                ) > 1 
+                THEN (
+                  SELECT MAX(timestamp) - MIN(timestamp)
+                  FROM page_views pv4
+                  WHERE pv4.session_id = s.session_id
+                )
+                ELSE 0 
+              END
+            ) / 1000,
+            2
+          ) as avg_time_spent_seconds,
+          ROUND(
+            CAST(
+              COUNT(DISTINCT CASE WHEN e.event_name = 'conversion' THEN s.session_id END) AS FLOAT
+            ) / NULLIF(COUNT(DISTINCT s.session_id), 0) * 100,
+            2
+          ) as conversion_rate
+        FROM sessions s
+        LEFT JOIN events e ON e.session_id = s.session_id
+        WHERE s.start_time >= ${currentStart} 
+        AND s.start_time <= ${currentEnd}
+      )
+      SELECT 
+        total_visitors,
+        bounce_rate,
+        avg_time_spent_seconds,
+        conversion_rate
+      FROM session_metrics;
+    `;
+
+    // Get analytics metrics
+    const analyticsResult = execSync(`wrangler d1 execute analytics-db --remote --command "${analyticsQuery}"`, { encoding: 'utf-8' });
+    const metrics = JSON.parse(analyticsResult);
+    const { total_visitors, bounce_rate, avg_time_spent_seconds, conversion_rate } = metrics.results[0] || {
+      total_visitors: 0,
+      bounce_rate: 0,
+      avg_time_spent_seconds: 0,
+      conversion_rate: 0
+    };
+
+    // Insert deployment metrics with analytics
     const insertQuery = `
       INSERT INTO deployment_metrics (
         deploy_time,
@@ -48,7 +114,11 @@ async function main() {
         commit_sha,
         branch,
         metrics_start_time,
-        metrics_end_time
+        metrics_end_time,
+        bounce_rate,
+        avg_time_spent_seconds,
+        total_visitors,
+        conversion_rate
       ) VALUES (
         ${deployTime},
         ${buildTime},
@@ -58,7 +128,11 @@ async function main() {
         '${commitSha}',
         '${branch}',
         ${currentStart},
-        ${currentEnd}
+        ${currentEnd},
+        ${bounce_rate},
+        ${avg_time_spent_seconds},
+        ${total_visitors},
+        ${conversion_rate}
       );
     `;
 
@@ -73,6 +147,11 @@ async function main() {
     console.log(`Environment: ${environment}`);
     console.log(`Commit SHA: ${commitSha}`);
     console.log(`Branch: ${branch}`);
+    console.log('\nAnalytics Metrics:');
+    console.log(`Total Visitors: ${total_visitors}`);
+    console.log(`Bounce Rate: ${bounce_rate}%`);
+    console.log(`Avg Time Spent: ${avg_time_spent_seconds} seconds`);
+    console.log(`Conversion Rate: ${conversion_rate}%`);
     console.log('::endgroup::');
 
   } catch (error) {
