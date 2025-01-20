@@ -41,7 +41,12 @@ jobs:
           pnpm add -g wrangler
           
       - name: Build TypeScript
-        run: pnpm build
+        run: |
+          # Compile scripts using the dedicated config
+          pnpm tsc -p tsconfig.scripts.json
+          
+          # Add execute permission to the CLI script
+          chmod +x dist/scripts/collect-metrics-cli.js
       
       - name: Collect and Save Metrics
         env:
