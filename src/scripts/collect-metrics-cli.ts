@@ -59,67 +59,46 @@ async function main() {
 
     // Get analytics metrics for the deployment timeframe
     const analyticsQuery = `
-      WITH session_metrics AS (
-        SELECT 
-          COUNT(DISTINCT pv.session_id) as total_visitors,
-          ROUND(
-            CAST(
-              SUM(CASE WHEN (
-                SELECT COUNT(*) 
-                FROM page_views pv2 
-                WHERE pv2.session_id = pv.session_id
-                AND pv2.timestamp >= ${currentStart}
-                AND pv2.timestamp <= ${currentEnd}
-              ) = 1 THEN 1 ELSE 0 END) AS FLOAT
-            ) / NULLIF(COUNT(DISTINCT pv.session_id), 0) * 100,
-            2
-          ) as bounce_rate,
-          ROUND(
-            AVG(
-              CASE 
-                WHEN (
-                  SELECT COUNT(*) 
-                  FROM page_views pv3 
-                  WHERE pv3.session_id = pv.session_id
-                  AND pv3.timestamp >= ${currentStart}
-                  AND pv3.timestamp <= ${currentEnd}
-                ) > 1 
-                THEN COALESCE(
-                  (
-                    SELECT MAX(time_spent)
-                    FROM page_views pv4
-                    WHERE pv4.session_id = pv.session_id
-                    AND pv4.timestamp >= ${currentStart}
-                    AND pv4.timestamp <= ${currentEnd}
-                  ), 0
-                )
-                ELSE 0 
-              END
-            ),
-            2
-          ) as avg_time_spent_seconds,
-          ROUND(
-            CAST(
-              COUNT(DISTINCT CASE 
-                WHEN e.event_name = 'conversion' 
-                AND e.timestamp >= ${currentStart}
-                AND e.timestamp <= ${currentEnd}
-                THEN pv.session_id 
-              END) AS FLOAT
-            ) / NULLIF(COUNT(DISTINCT pv.session_id), 0) * 100,
-            2
-          ) as conversion_rate
-        FROM page_views pv
-        LEFT JOIN events e ON e.session_id = pv.session_id
-        WHERE pv.timestamp >= ${currentStart} 
-        AND pv.timestamp <= ${currentEnd}
-      )
       SELECT 
-        total_visitors,
-        bounce_rate,
-        avg_time_spent_seconds,
-        conversion_rate
-      FROM session_metrics;
+        COALESCE(COUNT(DISTINCT pv.session_id), 0) as total_visitors,
+        COALESCE(
+          ROUND(
+            100.0 * SUM(CASE WHEN session_pageviews.pageview_count = 1 THEN 1 ELSE 0 END) / 
+            NULLIF(COUNT(DISTINCT pv.session_id), 0),
+            2
+          ),
+          0
+        ) as bounce_rate,
+        COALESCE(
+          ROUND(
+            AVG(CASE WHEN time_spent IS NOT NULL THEN time_spent ELSE 0 END),
+            2
+          ),
+          0
+        ) as avg_time_spent_seconds,
+        COALESCE(
+          ROUND(
+            100.0 * COUNT(DISTINCT CASE WHEN e.event_name = 'conversion' THEN pv.session_id END) /
+            NULLIF(COUNT(DISTINCT pv.session_id), 0),
+            2
+          ),
+          0
+        ) as conversion_rate
+      FROM page_views pv
+      LEFT JOIN (
+        SELECT 
+          session_id,
+          COUNT(*) as pageview_count
+        FROM page_views
+        WHERE timestamp >= ${currentStart} 
+        AND timestamp <= ${currentEnd}
+        GROUP BY session_id
+      ) session_pageviews ON pv.session_id = session_pageviews.session_id
+      LEFT JOIN events e ON e.session_id = pv.session_id 
+        AND e.timestamp >= ${currentStart} 
+        AND e.timestamp <= ${currentEnd}
+      WHERE pv.timestamp >= ${currentStart} 
+      AND pv.timestamp <= ${currentEnd}
     `;
 
     // Get analytics metrics
