@@ -53,7 +53,12 @@ jobs:
           
           # Add execute permission to the CLI script
           chmod +x dist/scripts/collect-metrics-cli.js
-      
+      - name: Check Wrangler WhoAMI
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          wrangler whoami
+          
       - name: Collect and Save Metrics
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
