@@ -1,6 +1,22 @@
 #!/usr/bin/env node
 import { execSync } from 'child_process';
 
+function extractJsonFromWranglerOutput(output: string): any {
+  // Find the first '[' character which indicates the start of JSON
+  const jsonStartIndex = output.indexOf('[');
+  if (jsonStartIndex === -1) {
+    throw new Error('No JSON data found in wrangler output');
+  }
+  
+  // Extract everything from the first '[' to the end
+  const jsonStr = output.substring(jsonStartIndex);
+  try {
+    return JSON.parse(jsonStr);
+  } catch (error) {
+    throw new Error(`Failed to parse JSON from wrangler output: ${error}`);
+  }
+}
+
 async function main() {
   const [deployTime, buildTime, status, environment, commitSha, branch] = process.argv.slice(2);
   
@@ -94,9 +110,9 @@ async function main() {
     `;
 
     // Get analytics metrics
-    const analyticsResult = execSync(`wrangler d1 execute analytics-db --remote --command "${analyticsQuery}"`, { encoding: 'utf-8' });
-    const metrics = JSON.parse(analyticsResult);
-    const { total_visitors, bounce_rate, avg_time_spent_seconds, conversion_rate } = metrics.results[0] || {
+    const analyticsOutput = execSync(`wrangler d1 execute analytics-db --remote --command "${analyticsQuery}"`, { encoding: 'utf-8' });
+    const analyticsJson = extractJsonFromWranglerOutput(analyticsOutput);
+    const { total_visitors, bounce_rate, avg_time_spent_seconds, conversion_rate } = analyticsJson[0]?.results[0] || {
       total_visitors: 0,
       bounce_rate: 0,
       avg_time_spent_seconds: 0,
