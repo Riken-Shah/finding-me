@@ -7,28 +7,9 @@ export async function getD1Database(context: any) {
     return context.env.DB;
   }
   
-  // For development with Wrangler
-  try {
-    const { D1Database } = await import('@cloudflare/workers-types');
-    const { unstable_dev } = await import('wrangler');
-    
-    const worker = await unstable_dev('src/worker.ts', {
-      config: './wrangler.toml',
-      experimental: { disableExperimentalWarning: true }
-    });
-    
-    const env = worker.env;
-    if (env.DB) {
-      return env.DB;
-    }
-  } catch (error) {
-    console.log('Failed to initialize D1 database with Wrangler:', error);
-  }
-
-  // For CI/CD environments, skip database operations
-  if (process.env.GITHUB_ACTIONS || process.env.CI) {
-    console.log('Running in CI environment - skipping database operations');
-    return null;
+  // For development (Next.js dev server)
+  if (process.env.DB) {
+    return process.env.DB;
   }
 
   throw new Error('Database binding not found. Make sure the DB binding is configured in Cloudflare Pages.');
