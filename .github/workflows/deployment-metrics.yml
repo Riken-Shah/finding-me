@@ -38,7 +38,13 @@ jobs:
       - name: Install dependencies
         run: |
           pnpm install --frozen-lockfile
+          pnpm add -D typescript @types/jest @types/node jest ts-jest @jest/globals
           pnpm add -g wrangler
+          
+      - name: Run Tests
+        run: |
+          # Run tests with ts-jest
+          pnpm jest --config jest.config.js
           
       - name: Build TypeScript
         run: |
