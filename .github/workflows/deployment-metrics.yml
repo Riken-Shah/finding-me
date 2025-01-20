@@ -1,0 +1,40 @@
+name: Deployment Metrics
+
+on:
+  deployment_status
+
+jobs:
+  track-metrics:
+    if: github.event.deployment_status.state == 'success' || github.event.deployment_status.state == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm add -g wrangler
+          
+      - name: Build TypeScript
+        run: pnpm build
+      
+      - name: Collect and Save Metrics
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          DEPLOY_TIME=$(date +%s)
+          BUILD_TIME=$(date -d "${{ github.event.deployment.created_at }}" +%s)
+          
+          node dist/scripts/collect-metrics-cli.js \
+            $DEPLOY_TIME \
+            $BUILD_TIME \
+            "${{ github.event.deployment_status.state }}" \
+            "${{ github.event.deployment.environment }}" \
+            "${{ github.sha }}" \
+            "${{ github.ref }}" 
