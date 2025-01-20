@@ -92,6 +92,21 @@ interface DeploymentInfo {
 export async function collectAndSaveMetrics(deploymentInfo: DeploymentInfo, context?: any): Promise<void> {
   const db = await getD1Database(context);
   
+  // Skip metrics collection if no database is available
+  if (!db) {
+    console.log('::group::Deployment Metrics');
+    console.log('Skipping metrics collection - no database available');
+    console.log(`Deploy Time: ${deploymentInfo.deployTime}`);
+    console.log(`Build Time: ${deploymentInfo.buildTime}`);
+    console.log(`Duration: ${deploymentInfo.deployTime - deploymentInfo.buildTime} seconds`);
+    console.log(`Status: ${deploymentInfo.status}`);
+    console.log(`Environment: ${deploymentInfo.environment}`);
+    console.log(`Commit SHA: ${deploymentInfo.commitSha}`);
+    console.log(`Branch: ${deploymentInfo.branch}`);
+    console.log('::endgroup::');
+    return;
+  }
+  
   // Calculate time ranges
   const currentEnd = Math.floor(Date.now() / 1000);
   const currentStart = currentEnd - 86400;
