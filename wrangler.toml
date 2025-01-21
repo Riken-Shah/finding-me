@@ -22,3 +22,6 @@ binding = "DB"
 database_name = "analytics-db"
 database_id = "a6a0b776-e0da-40f7-b955-c966bf2ac02e"
 migrations_dir = "migrations"
+
+[ai]
+binding = "AI"
