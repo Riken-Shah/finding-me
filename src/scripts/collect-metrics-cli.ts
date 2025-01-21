@@ -26,10 +26,30 @@ async function main() {
   }
 
   try {
-    const currentEnd = Math.floor(Date.now() / 1000);
-    const currentStart = currentEnd - 86400;
+    // Convert Unix timestamps to milliseconds
+    const currentEnd = parseInt(deployTime) * 1000;
+    const currentStart = currentEnd - (86400 * 1000); // 24 hours before deployment
     const previousEnd = currentStart;
-    const previousStart = previousEnd - 86400;
+    const previousStart = previousEnd - (86400 * 1000);
+
+    console.log('Time Range:', {
+      start: new Date(currentStart).toISOString(),
+      end: new Date(currentEnd).toISOString()
+    });
+
+    // First check if we have data in the time range
+    const checkDataQuery = `
+      SELECT 
+        COUNT(*) as page_views_in_range,
+        (SELECT COUNT(*) FROM events WHERE timestamp >= ${currentStart} AND timestamp <= ${currentEnd}) as events_in_range,
+        (SELECT COUNT(*) FROM sessions WHERE start_time >= ${currentStart} AND start_time <= ${currentEnd}) as sessions_in_range
+      FROM page_views 
+      WHERE timestamp >= ${currentStart} AND timestamp <= ${currentEnd};
+    `;
+
+    const checkDataOutput = execSync(`wrangler d1 execute analytics-db --remote --command "${checkDataQuery}"`, { encoding: 'utf-8' });
+    const checkDataJson = extractJsonFromWranglerOutput(checkDataOutput);
+    console.log('Data in range:', checkDataJson[0]?.results[0]);
 
     const deploymentDuration = parseInt(deployTime) - parseInt(buildTime);
 
@@ -71,7 +91,12 @@ async function main() {
         ) as bounce_rate,
         COALESCE(
           ROUND(
-            AVG(CASE WHEN pv.time_spent IS NOT NULL THEN pv.time_spent ELSE 0 END) / 1000,
+            AVG(
+              CASE 
+                WHEN session_times.duration IS NOT NULL THEN session_times.duration 
+                ELSE 0 
+              END
+            ) / 1000,
             2
           ),
           0
@@ -94,6 +119,16 @@ async function main() {
         AND timestamp <= ${currentEnd}
         GROUP BY session_id
       ) session_pageviews ON pv.session_id = session_pageviews.session_id
+      LEFT JOIN (
+        SELECT 
+          session_id,
+          MAX(timestamp) - MIN(timestamp) as duration
+        FROM page_views
+        WHERE timestamp >= ${currentStart} 
+        AND timestamp <= ${currentEnd}
+        GROUP BY session_id
+        HAVING COUNT(*) > 1
+      ) session_times ON pv.session_id = session_times.session_id
       LEFT JOIN events e ON e.session_id = pv.session_id 
         AND e.timestamp >= ${currentStart} 
         AND e.timestamp <= ${currentEnd}
