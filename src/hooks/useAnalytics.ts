@@ -29,6 +29,11 @@ interface TrackEventOptions {
   maxScrollDepth?: number;
 }
 
+interface TrackingResponse {
+  error?: string;
+  success?: boolean;
+}
+
 interface PerformanceMetrics {
   ttfb?: number;           // Time to First Byte
   fcp?: number;           // First Contentful Paint
@@ -98,9 +103,38 @@ export function useAnalytics() {
     if (options.element) headers.set('x-element', options.element);
     if (options.href) headers.set('x-href', options.href);
     if (options.scrollDepth) headers.set('x-scroll-depth', options.scrollDepth);
+    if (options.timeSpent) headers.set('x-time-spent', options.timeSpent.toString());
+    if (options.ttfb) headers.set('x-ttfb', options.ttfb.toString());
+    if (options.fcp) headers.set('x-fcp', options.fcp.toString());
+    if (options.lcp) headers.set('x-lcp', options.lcp.toString());
+    if (options.cls) headers.set('x-cls', options.cls.toString());
+    if (options.fid) headers.set('x-fid', options.fid.toString());
 
     try {
-      await fetch('/api/analytics/tracking', { headers });
+      const response = await fetch('/api/analytics/tracking', { headers });
+      const data = await response.json() as TrackingResponse;
+      
+      if (data.error === 'Invalid session') {
+        // Clear the existing session
+        localStorage.removeItem(SESSION_ID_KEY);
+        localStorage.removeItem(SESSION_START_KEY);
+        
+        // Get a new session ID
+        const newSessionId = getSessionId();
+        if (!newSessionId) return;
+        
+        // Retry the track call with the new session
+        const newHeaders = new Headers(headers);
+        newHeaders.set('x-session-id', newSessionId);
+        newHeaders.set('x-event', 'session_start');
+        
+        // First create the session
+        await fetch('/api/analytics/tracking', { headers: newHeaders });
+        
+        // Then retry the original tracking request
+        newHeaders.delete('x-event');
+        await fetch('/api/analytics/tracking', { headers: newHeaders });
+      }
     } catch (error) {
       console.error('Error tracking analytics:', error);
     }
@@ -196,12 +230,13 @@ export function useAnalytics() {
 
       // Only send metrics if we have at least one value
       if (Object.keys(metrics).length > 0) {
-        batchTrack([
-          { event: 'performance', ...metrics }
-        ]);
+        track({
+          ...metrics,
+          timeSpent: Date.now() - engagement.current.startTime
+        });
       }
     }, 2000),
-    [batchTrack, getSessionId]
+    [track, getSessionId]
   );
 
   const updateMetrics = useCallback((newMetrics: Partial<PerformanceMetrics>) => {
@@ -355,6 +390,39 @@ export function useAnalytics() {
     }
   }, [getSessionId]);
 
+  // Move handleBeforeUnload outside useEffect and define it with useCallback
+  const handleBeforeUnload = useCallback(() => {
+    clearInterval(timeUpdateInterval.current);
+    const finalTimeOnPage = Date.now() - engagement.current.startTime;
+    
+    if (isEngaged.current) {
+      track({
+        event: 'session_end',
+        timeSpent: finalTimeOnPage,
+        scrollDepth: engagement.current.maxScrollDepth.toString(),
+        interactions: engagement.current.interactions,
+        ...metricsCollected.current // Include final performance metrics
+      });
+    } else {
+      track({
+        event: 'bounce',
+        timeSpent: finalTimeOnPage,
+        scrollDepth: engagement.current.maxScrollDepth.toString(),
+        interactions: engagement.current.interactions,
+        ...metricsCollected.current // Include final performance metrics
+      });
+    }
+
+    // Clear the bounce timeout to prevent multiple events
+    if (bounceTimeout.current) {
+      clearTimeout(bounceTimeout.current);
+      bounceTimeout.current = undefined;
+    }
+  }, [track]);
+
+  // Add timeUpdateInterval ref
+  const timeUpdateInterval = useRef<NodeJS.Timeout>();
+
   // Track page views and setup bounce tracking
   useEffect(() => {
     const sessionId = getSessionId();
@@ -416,7 +484,7 @@ export function useAnalytics() {
     }, 1000);
 
     // Track periodic time updates
-    const timeUpdateInterval = setInterval(() => {
+    timeUpdateInterval.current = setInterval(() => {
       engagement.current.timeOnPage = Date.now() - engagement.current.startTime;
     }, 1000);
 
@@ -426,33 +494,15 @@ export function useAnalytics() {
     window.addEventListener('click', handleEngagement);
     window.addEventListener('keydown', handleEngagement);
     window.addEventListener('scroll', handleScroll);
-
-    // End session when user leaves
-    const handleBeforeUnload = () => {
-      clearInterval(timeUpdateInterval);
-      const finalTimeOnPage = Date.now() - engagement.current.startTime;
-      
-      if (isEngaged.current) {
-        trackEvent('session_end', {
-          timeSpent: finalTimeOnPage,
-          scrollDepth: engagement.current.maxScrollDepth.toString(),
-          interactions: engagement.current.interactions
-        });
-      } else {
-        trackEvent('bounce', {
-          timeSpent: finalTimeOnPage,
-          scrollDepth: engagement.current.maxScrollDepth.toString(),
-          interactions: engagement.current.interactions
-        });
-      }
-    };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       if (bounceTimeout.current) {
         clearTimeout(bounceTimeout.current);
       }
-      clearInterval(timeUpdateInterval);
+      if (timeUpdateInterval.current) {
+        clearInterval(timeUpdateInterval.current);
+      }
       window.removeEventListener('scroll', handleEngagement);
       window.removeEventListener('mousemove', handleEngagement);
       window.removeEventListener('touchstart', handleEngagement);
@@ -462,7 +512,7 @@ export function useAnalytics() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       cleanup();
     };
-  }, [pathname, getSessionId, trackPerformance, markEngaged]);
+  }, [pathname, getSessionId, trackPerformance, markEngaged, handleBeforeUnload, batchTrack, trackEvent, trackScroll]);
 
   // Initialize section tracking on pathname change
   useEffect(() => {

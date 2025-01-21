@@ -71,7 +71,7 @@ async function main() {
         ) as bounce_rate,
         COALESCE(
           ROUND(
-            AVG(CASE WHEN time_spent IS NOT NULL THEN time_spent ELSE 0 END),
+            AVG(CASE WHEN pv.time_spent IS NOT NULL THEN pv.time_spent ELSE 0 END) / 1000,
             2
           ),
           0

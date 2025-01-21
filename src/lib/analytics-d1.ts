@@ -117,24 +117,64 @@ export class Analytics {
         .prepare('UPDATE sessions SET end_time = ? WHERE session_id = ?')
         .bind(timestamp, data.sessionId)
         .run();
+
+      // Update the last page view with time spent
+      if (data.timeSpent) {
+        await this.db
+          .prepare(`
+            UPDATE page_views 
+            SET time_spent = ? 
+            WHERE session_id = ? 
+            AND id = (
+              SELECT id 
+              FROM page_views 
+              WHERE session_id = ? 
+              ORDER BY timestamp DESC 
+              LIMIT 1
+            )
+          `)
+          .bind(data.timeSpent, data.sessionId, data.sessionId)
+          .run();
+      }
       return { success: true };
     }
 
-    // Track page views
+    // Track page views with performance metrics
     if (data.page) {
+      // First, update the previous page view with time spent if available
+      if (data.timeSpent) {
+        await this.db
+          .prepare(`
+            UPDATE page_views 
+            SET time_spent = ? 
+            WHERE session_id = ? 
+            AND id = (
+              SELECT id 
+              FROM page_views 
+              WHERE session_id = ? 
+              ORDER BY timestamp DESC 
+              LIMIT 1
+            )
+          `)
+          .bind(data.timeSpent, data.sessionId, data.sessionId)
+          .run();
+      }
+
+      // Then insert the new page view
       await this.db
         .prepare(`
           INSERT INTO page_views (
-            session_id, page, timestamp, scroll_depth, 
+            session_id, page, timestamp, scroll_depth, time_spent,
             ttfb, fcp, lcp, cls, fid
           ) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
         .bind(
           data.sessionId,
           data.page,
           timestamp,
           data.scrollDepth ? parseInt(data.scrollDepth) : null,
+          data.timeSpent || null,
           data.ttfb || null,
           data.fcp || null,
           data.lcp || null,
@@ -161,6 +201,38 @@ export class Analytics {
           timestamp
         )
         .run();
+
+      // If this is a performance event, update the latest page view with metrics
+      if (data.event === 'performance') {
+        await this.db
+          .prepare(`
+            UPDATE page_views 
+            SET 
+              ttfb = COALESCE(?, ttfb),
+              fcp = COALESCE(?, fcp),
+              lcp = COALESCE(?, lcp),
+              cls = COALESCE(?, cls),
+              fid = COALESCE(?, fid)
+            WHERE session_id = ? 
+            AND id = (
+              SELECT id 
+              FROM page_views 
+              WHERE session_id = ? 
+              ORDER BY timestamp DESC 
+              LIMIT 1
+            )
+          `)
+          .bind(
+            data.ttfb || null,
+            data.fcp || null,
+            data.lcp || null,
+            data.cls || null,
+            data.fid || null,
+            data.sessionId,
+            data.sessionId
+          )
+          .run();
+      }
     }
 
     return { success: true };
