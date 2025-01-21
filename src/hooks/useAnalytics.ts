@@ -123,18 +123,23 @@ export function useAnalytics() {
         const newSessionId = getSessionId();
         if (!newSessionId) return;
         
-        // Retry the track call with the new session
+        // Create new headers with the new session ID
         const newHeaders = new Headers(headers);
         newHeaders.set('x-session-id', newSessionId);
-        newHeaders.set('x-event', 'session_start');
         
-        // First create the session
-        await fetch('/api/analytics/tracking', { headers: newHeaders });
+        // First create a new session
+        await fetch('/api/analytics/tracking', { 
+          headers: new Headers({
+            'x-session-id': newSessionId,
+            'x-event': 'session_start'
+          })
+        });
         
-        // Then retry the original tracking request
-        newHeaders.delete('x-event');
-        await fetch('/api/analytics/tracking', { headers: newHeaders });
+        // Then retry the original tracking request with the new session ID
+        return fetch('/api/analytics/tracking', { headers: newHeaders });
       }
+      
+      return response;
     } catch (error) {
       console.error('Error tracking analytics:', error);
     }
