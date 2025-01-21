@@ -95,7 +95,15 @@ export default function AnalyticsDashboard() {
     <div className="min-h-screen bg-background p-6 space-y-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+            <a 
+              href="/admin/deployments" 
+              className="text-sm px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+            >
+              View Deployment Stats →
+            </a>
+          </div>
           <select
             value={timeframe.value}
             onChange={(e) => {
