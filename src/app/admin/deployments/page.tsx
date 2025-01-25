@@ -14,7 +14,7 @@ export const metadata = {
 export default function DeploymentAnalyticsPage() {
   return (
     <main>
-      <DeploymentAnalyticsDashboard />
+      <h1>Deployment Analytics and Performance Metrics</h1>
+      <DeploymentAnalyticsDashboard style={{ color: #333 }} />
     </main>
   );
-} 
