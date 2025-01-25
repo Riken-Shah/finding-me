@@ -1,5 +1,4 @@
-import { analyzeRepo, RepoAnalysis, UiChange, applyChanges, commitAndPush, setupRepo, PageAnalysis, FileChange } from './utils';
-import simpleGit from 'simple-git';
+import { analyzeRepo, RepoAnalysis, UiChange, applyChanges, commitAndPush, setupRepo, PageAnalysis, FileChange, createBranch, createPullRequest } from './utils';
 
 export interface Env {
 	// If you set another name in wrangler.toml as the value for 'binding',
@@ -27,40 +26,40 @@ interface DeploymentMetrics {
 	created_at: number;
 }
 
-// Define specific UI change types
+// Define specific UI change types with detailed descriptions
 type UiChangeType = 
-	| 'TEXT_CHANGE'        // Changes to text content, wording, or messaging
-	| 'SPACING'            // Changes to margins, padding, or layout spacing
-	| 'PLACEMENT_CHANGE'   // Repositioning elements on the page
-	| 'COLOR_CHANGE'       // Changes to colors, backgrounds, or themes
-	| 'SIZE_CHANGE'        // Changes to element dimensions
-	| 'VISIBILITY_CHANGE'  // Show/hide elements or change opacity
-	| 'ANIMATION_CHANGE'   // Add/modify animations or transitions
-	| 'CTA_CHANGE'         // Changes to call-to-action elements
-	| 'LAYOUT_CHANGE'      // Changes to overall layout structure
-	| 'RESPONSIVE_CHANGE'; // Changes specific to certain screen sizes
+	| 'TEXT_CHANGE'        // Changes to text content, headlines, paragraphs, labels, or any textual elements
+	| 'SPACING'            // Adjustments to margins, padding, gaps between elements, or whitespace
+	| 'PLACEMENT_CHANGE'   // Changes to element positioning, reordering, or structural hierarchy
+	| 'COLOR_CHANGE'       // Modifications to colors including text, backgrounds, borders, gradients, or themes
+	| 'SIZE_CHANGE'        // Adjustments to width, height, font sizes, or scaling of elements
+	| 'VISIBILITY_CHANGE'  // Toggle visibility, opacity changes, or conditional rendering of elements
+	| 'ANIMATION_CHANGE'   // Add/modify transitions, hover effects, loading states, or motion design
+	| 'CTA_CHANGE'         // Modifications to buttons, links, forms, or any interactive elements
+	| 'LAYOUT_CHANGE'      // Changes to grid systems, flexbox layouts, or overall page structure
+	| 'RESPONSIVE_CHANGE'; // Mobile-specific adjustments, breakpoints, or adaptive layouts
 
 interface UIModification {
 	type: UiChangeType;
 	lineNumber: number;
-	content?: string;
-	reasoning: string;
+	content?: string;           // The actual code change to be applied
+	reasoning: string;          // Detailed explanation of why this change will improve metrics
 	previous_metric_evidence?: {
-		deployment_time: number;
+		deployment_time: number;  // Unix timestamp of the previous deployment
 		metric_improvement: {
-			bounce_rate_change?: number;
-			avg_time_change?: number;
-			conversion_rate_change?: number;
+			bounce_rate_change?: number;    // Percentage change in bounce rate (-100 to 100)
+			avg_time_change?: number;       // Change in average time spent in seconds
+			conversion_rate_change?: number; // Percentage change in conversion rate (-100 to 100)
 		};
 	};
 }
 
 interface AIResponse {
 	changes: Array<{
-		filePath: string;
+		filePath: string;           // Full path to the file being modified
 		modifications: UIModification[];
-		confidence_score: number; // 0 to 1
-		reasoning: string; // Overall reasoning for changes in this file
+		confidence_score: number;    // 0 to 1, where 1 represents highest confidence
+		reasoning: string;          // Overall explanation for all changes in this file
 	}>;
 }
 
@@ -116,6 +115,43 @@ async function analyzePageAndSuggestChanges(
 		You are an AI agent responsible for improving website metrics through specific UI changes.
 		Analyze this page and suggest improvements based on historical data.
 		
+		IMPORTANT: 
+		1. Return ONLY valid JSON without any additional text or explanation
+		2. Do not use escaped characters in strings
+		3. Use single quotes for HTML/JSX attributes
+		4. Keep all strings simple and avoid special characters
+		
+		EXPECTED RESPONSE SCHEMA:
+		{
+			"changes": [
+				{
+					"filePath": "string",
+					"modifications": [
+						{
+							"type": "string",
+							"lineNumber": number,
+							"content": "string",
+							"reasoning": "string"
+						}
+					],
+					"confidence_score": number,
+					"reasoning": "string"
+				}
+			]
+		}
+
+		UI CHANGE TYPES EXPLANATION:
+		- TEXT_CHANGE: Modifications to any textual content including headlines, paragraphs, labels
+		- SPACING: Adjustments to margins, padding, gaps between elements, whitespace
+		- PLACEMENT_CHANGE: Changes to element positioning, reordering, structural hierarchy
+		- COLOR_CHANGE: Modifications to colors including text, backgrounds, borders, gradients, themes
+		- SIZE_CHANGE: Adjustments to width, height, font sizes, element scaling
+		- VISIBILITY_CHANGE: Toggle visibility, opacity changes, conditional rendering
+		- ANIMATION_CHANGE: Add/modify transitions, hover effects, loading states, motion design
+		- CTA_CHANGE: Modifications to buttons, links, forms, interactive elements
+		- LAYOUT_CHANGE: Changes to grid systems, flexbox layouts, overall page structure
+		- RESPONSIVE_CHANGE: Mobile-specific adjustments, breakpoints, adaptive layouts
+
 		PAGE BEING ANALYZED:
 		Main File: ${page.mainFile}
 		Component Files: ${page.components.join(', ')}
@@ -147,36 +183,6 @@ async function analyzePageAndSuggestChanges(
 		9. LAYOUT_CHANGE: Change overall layout structure
 		10. RESPONSIVE_CHANGE: Modify behavior on different screen sizes
 
-		RESPONSE FORMAT:
-		Return a valid JSON array of changes:
-		{
-			"changes": [
-				{
-					"filePath": string,
-					"modifications": [
-						{
-							"type": "TEXT_CHANGE" | "SPACING" | "PLACEMENT_CHANGE" | "COLOR_CHANGE" | 
-									"SIZE_CHANGE" | "VISIBILITY_CHANGE" | "ANIMATION_CHANGE" | 
-									"CTA_CHANGE" | "LAYOUT_CHANGE" | "RESPONSIVE_CHANGE",
-							"lineNumber": number,
-							"content": string (if applicable),
-							"reasoning": string (specific reasoning for this change),
-							"previous_metric_evidence": {
-								"deployment_time": number,
-								"metric_improvement": {
-									"bounce_rate_change": number (optional),
-									"avg_time_change": number (optional),
-									"conversion_rate_change": number (optional)
-								}
-							}
-						}
-					],
-					"confidence_score": number (0 to 1),
-					"reasoning": string (overall reasoning for changes in this file)
-				}
-			]
-		}
-		
 		REQUIREMENTS:
 		1. Only suggest changes with clear evidence of positive impact from historical data
 		2. Each modification must have specific reasoning explaining why it will help
@@ -216,55 +222,48 @@ async function analyzePageAndSuggestChanges(
 			}
 		}
 
-		console.log('[AI] 📜 Raw response:', responseText);
-		
-		// Try to extract and combine multiple JSON objects from the response
-		let allChanges: any[] = [];
-		const jsonMatches = responseText.match(/\{[\s\S]*?\}/g) || [];
-		
-		if (jsonMatches.length === 0) {
-			console.error('[AI] ❌ No JSON objects found in response');
-			throw new Error('No JSON found in AI response');
-		}
+		// Clean up the response text before parsing
+		const cleanedResponse = responseText
+			.trim()
+			// Remove any markdown code block markers
+			.replace(/```json\s*|\s*```/g, '')
+			// Remove any non-JSON text before or after the JSON object
+			.replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
 
-		console.log(`[AI] 🔍 Found ${jsonMatches.length} JSON objects in response`);
-		
-		// Parse each JSON object and collect all changes
-		for (const jsonStr of jsonMatches) {
-			try {
-				const parsed = JSON.parse(jsonStr);
-				if (parsed.changes && Array.isArray(parsed.changes)) {
-					allChanges = [...allChanges, ...parsed.changes];
-				}
-			} catch (parseError) {
-				console.warn('[AI] ⚠️ Failed to parse one JSON object, continuing with others:', parseError);
+		try {
+			const parsed = JSON.parse(cleanedResponse);
+			
+			// Validate the response structure
+			if (!parsed.changes || !Array.isArray(parsed.changes)) {
+				throw new Error('Invalid response format: missing changes array');
 			}
-		}
 
-		if (allChanges.length === 0) {
-			console.error('[AI] ❌ No valid changes found in any JSON object');
-			throw new Error('No valid changes found in AI response');
-		}
+			// Clean and validate each change
+			const result: AIResponse = {
+				changes: parsed.changes.map(change => ({
+					filePath: String(change.filePath || ''),
+					modifications: Array.isArray(change.modifications) 
+						? change.modifications.map(mod => ({
+							type: mod.type,
+							lineNumber: Number(mod.lineNumber),
+							content: mod.content ? String(mod.content) : undefined,
+							reasoning: String(mod.reasoning)
+						}))
+						: [],
+					confidence_score: Number(change.confidence_score) || 0.5,
+					reasoning: String(change.reasoning || 'No reasoning provided')
+				}))
+			};
 
-		// Combine all changes into a single response
-		const result: AIResponse = {
-			changes: allChanges.map(change => ({
-				...change,
-				confidence_score: change.confidence_score || 0.5, // Default confidence if missing
-				modifications: Array.isArray(change.modifications) ? change.modifications : [],
-				reasoning: change.reasoning || 'No reasoning provided'
-			}))
-		};
-		
-		console.log(`[AI] ✨ Successfully combined ${result.changes.length} changes from ${jsonMatches.length} JSON objects`);
-		result.changes.forEach((change, index) => {
-			console.log(`\n[AI] 📌 Change ${index + 1}/${result.changes.length}:`);
-			console.log(`    File: ${change.filePath}`);
-			console.log(`    Confidence: ${(change.confidence_score * 100).toFixed(1)}%`);
-			console.log(`    Modifications: ${change.modifications.length}`);
-		});
-		
-		return result;
+			console.log(`[AI] ✨ Successfully parsed ${result.changes.length} changes`);
+			return result;
+
+		} catch (parseError) {
+			console.error('[AI] ❌ JSON Parse Error:', parseError);
+			console.error('[AI] Raw Response:', responseText);
+			console.error('[AI] Cleaned Response:', cleanedResponse);
+			throw new Error(`Failed to parse AI response JSON: ${parseError.message}`);
+		}
 	} catch (error) {
 		console.error('[AI] ❌ Failed to process AI response:', error);
 		throw new Error('Failed to generate valid UI improvement suggestions');
@@ -287,14 +286,10 @@ export default {
 			console.log("Github token: ", env.GITHUB_TOKEN)
 			const repoAnalysis = await analyzeRepo(repoUrl, env.GITHUB_TOKEN);
 			
-			// Filter out route files and log relevant files
-			const relevantPages = repoAnalysis.pages.filter(page => {
-				const isRouteFile = page.mainFile.includes('route.ts') || page.mainFile.includes('api/');
-				const isRelevantFile = page.mainFile.endsWith('.tsx') || 
-									 page.mainFile.endsWith('.jsx') || 
-									 page.mainFile.endsWith('.css');
-				return !isRouteFile && isRelevantFile;
-			});
+			// Filter to only analyze page.tsx
+			const relevantPages = repoAnalysis.pages.filter(page => 
+				page.mainFile.endsWith('page.tsx')
+			);
 
 			console.log('\n[Analysis] Files to be processed:');
 			relevantPages.forEach(page => {
@@ -318,29 +313,67 @@ export default {
 					repoAnalysis.recentChanges
 				);
 				allSuggestions.push(analysis);
+				
+				// Log the suggestions for this page
+				console.log('\n[Suggestions] 📝 Proposed changes for:', page.mainFile);
+				analysis.changes.forEach(change => {
+					console.log(`\nFile: ${change.filePath}`);
+					console.log(`Confidence: ${change.confidence_score}`);
+					console.log(`Reasoning: ${change.reasoning}`);
+					console.log('\nModifications:');
+					change.modifications.forEach(mod => {
+						console.log(`\n  Type: ${mod.type}`);
+						console.log(`  Line: ${mod.lineNumber}`);
+						console.log(`  Reasoning: ${mod.reasoning}`);
+						if (mod.content) {
+							console.log(`  Content:\n    ${mod.content.replace(/\n/g, '\n    ')}`);
+						}
+					});
+				});
+				console.log('\n-------------------');
 			}
 			console.log(`[Analysis] Completed analysis for ${allSuggestions.length} pages`);
 
-			// 4. Apply changes using git
+			// 4. Apply changes using GitHub API
 			console.log('[Git] Starting to apply changes');
-			const git = simpleGit('/tmp/repo-analysis');
 			const [owner, repo] = repoUrl.replace('https://github.com/', '').split('/');
+			
+			// Create a unique branch name with timestamp
+			const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+			const branchName = `metrics-improvement-${timestamp}`;
+			
+			// Create a new branch for improvements
+			console.log(`[Git] Creating new branch: ${branchName}`);
+			await createBranch(env.GITHUB_TOKEN, owner, repo, branchName);
+
+			// Apply changes to files
 			for (const analysis of allSuggestions) {
-				await applyChanges(analysis.changes, env.GITHUB_TOKEN, owner, repo, 'metrics-improvement');
+				await applyChanges(analysis.changes, env.GITHUB_TOKEN, owner, repo, branchName, env.AI);
 			}
 			console.log('[Git] Finished applying all changes');
 
-			// 5. Commit and push changes
-			console.log('[Git] Committing changes');
-			const commitMessage = `UI improvements based on metric analysis\n\n${
-				allSuggestions.map(analysis => 
-					analysis.changes.map(change => 
-						`File: ${change.filePath}\nReasoning: ${change.reasoning}`
-					).join('\n\n')
+			// Create a pull request with the changes
+			console.log('[Git] Creating pull request');
+			const prTitle = `UI Improvements based on Metric Analysis - ${timestamp}`;
+			const prBody = allSuggestions.map(analysis => 
+				analysis.changes.map(change => 
+					`## ${change.filePath}\n\n${change.reasoning}\n\n${
+						change.modifications.map(mod => 
+							`- ${mod.type}: ${mod.reasoning}`
+						).join('\n')
+					}`
 				).join('\n\n')
-			}`;
-			await commitAndPush(env.GITHUB_TOKEN, commitMessage, owner, repo, 'metrics-improvement');
-			console.log('[Git] Successfully pushed changes');
+			).join('\n\n');
+
+			await createPullRequest(
+				env.GITHUB_TOKEN,
+				owner,
+				repo,
+				branchName,
+				prTitle,
+				prBody
+			);
+			console.log('[Git] Successfully created pull request');
 
 			// 6. Return analysis and suggestions
 			console.log('[Worker] Preparing response');

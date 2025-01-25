@@ -2,6 +2,7 @@ import { simpleGit, SimpleGit } from 'simple-git';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import fetch from "node-fetch";
+import { Ai } from '@cloudflare/ai';
 
 export interface FileChange {
   file: string;
@@ -45,6 +46,22 @@ type UiChangeType =
   | 'LAYOUT_CHANGE'
   | 'RESPONSIVE_CHANGE';
 
+interface GitHubRef {
+  ref: string;
+  object: {
+    sha: string;
+    type: string;
+    url: string;
+  };
+}
+
+interface GitHubContent {
+  sha: string;
+  content: string;
+  path: string;
+  size: number;
+}
+
 export async function setupRepo(repoUrl: string, githubToken: string): Promise<void> {
   // Validate the token works by making a test API call
   const response = await fetch('https://api.github.com/user', {
@@ -63,34 +80,61 @@ export async function setupRepo(repoUrl: string, githubToken: string): Promise<v
 }
 
 export async function createBranch(githubToken: string, owner: string, repo: string, branchName: string): Promise<void> {
-  // Get the SHA of the default branch
-  const mainResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/ref/heads/main`, {
-    headers: {
-      'Authorization': `Bearer ${githubToken}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'metrics-improvement-bot'
+  try {
+    // First check if branch exists
+    const branchResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${branchName}`, {
+      headers: {
+        'Authorization': `Bearer ${githubToken}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'metrics-improvement-bot'
+      }
+    });
+
+    if (branchResponse.status === 404) {
+      // Branch doesn't exist, create it from default branch
+      const defaultBranchResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/main`, {
+        headers: {
+          'Authorization': `Bearer ${githubToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'metrics-improvement-bot'
+        }
+      });
+
+      if (!defaultBranchResponse.ok) {
+        throw new Error(`Failed to get default branch: ${defaultBranchResponse.statusText}`);
+      }
+
+      const defaultBranchData = await defaultBranchResponse.json() as GitHubRef;
+      const sha = defaultBranchData.object.sha;
+
+      // Create new branch
+      const createResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${githubToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'metrics-improvement-bot'
+        },
+        body: JSON.stringify({
+          ref: `refs/heads/${branchName}`,
+          sha: sha
+        })
+      });
+
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json();
+        throw new Error(`Failed to create branch: ${createResponse.statusText} - ${JSON.stringify(errorData)}`);
+      }
+
+      console.log(`[Git] Created new branch: ${branchName}`);
+    } else if (branchResponse.ok) {
+      console.log(`[Git] Branch ${branchName} already exists, will update existing branch`);
+    } else {
+      throw new Error(`Unexpected status checking branch: ${branchResponse.statusText}`);
     }
-  });
-
-  const mainData = await mainResponse.json();
-  const sha = (mainData as any).object.sha;
-
-  // Create new branch
-  const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${githubToken}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'metrics-improvement-bot'
-    },
-    body: JSON.stringify({
-      ref: `refs/heads/${branchName}`,
-      sha: sha
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to create branch: ${response.statusText}`);
+  } catch (error) {
+    console.error('[Git] Branch creation error:', error);
+    throw error;
   }
 }
 
@@ -99,25 +143,109 @@ export async function applyChanges(
   githubToken: string, 
   owner: string, 
   repo: string, 
-  branchName: string
+  branchName: string,
+  ai: Ai
 ): Promise<void> {
-  for (const change of changes) {
-    console.log(`[Git] Applying changes to ${change.filePath}`);
+  // Group changes by file
+  const changesByFile = changes.reduce((acc, change) => {
+    if (!acc[change.filePath]) {
+      acc[change.filePath] = [];
+    }
+    acc[change.filePath].push(change);
+    return acc;
+  }, {} as Record<string, UiChange[]>);
+
+  for (const [filePath, fileChanges] of Object.entries(changesByFile)) {
+    console.log(`[Git] Applying changes to ${filePath}`);
     
     try {
       // Get current file content
-      const content = await fetchGitHubContent(change.filePath, githubToken, owner, repo);
-      const lines = content.split('\n');
+      const content = await fetchGitHubContent(filePath, githubToken, owner, repo);
       
-      // Apply modifications
-      const sortedMods = [...change.modifications].sort((a, b) => b.lineNumber - a.lineNumber);
-      for (const mod of sortedMods) {
-        if (!mod.content) continue;
-        lines[mod.lineNumber - 1] = mod.content;
+      // Prepare the prompt for LLM
+      const prompt = `You are an expert code modifier. Below is a file's content and a list of changes to apply.
+Return ONLY the complete modified file content without any additional text, markdown formatting, or code block markers.
+
+FILE CONTENT:
+${content}
+
+CHANGES TO APPLY:
+${fileChanges.map(change => 
+  change.modifications.map(mod => 
+    `Line ${mod.lineNumber}: ${mod.type}
+     Content: ${mod.content || 'No content change'}
+     Reasoning: ${mod.reasoning}`
+  ).join('\n\n')
+).join('\n\n')}
+
+RULES:
+1. Return ONLY the modified code
+2. No explanations or markdown
+3. No code block markers
+4. Keep all imports and dependencies
+5. Maintain indentation
+6. Skip invalid line numbers`;
+
+      // Get file SHA from the target branch
+      const shaResponse = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branchName}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${githubToken}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'metrics-improvement-bot'
+          }
+        }
+      );
+
+      let fileSha: string;
+      if (shaResponse.status === 404) {
+        console.log(`[Git] File ${filePath} doesn't exist in branch ${branchName}, will create it`);
+        fileSha = '';
+      } else if (!shaResponse.ok) {
+        throw new Error(`Failed to get file SHA: ${shaResponse.statusText}`);
+      } else {
+        const fileData = await shaResponse.json() as GitHubContent;
+        fileSha = fileData.sha;
+      }
+
+      // Call Cloudflare AI to apply changes
+      const response = await ai.run('@cf/meta/llama-2-7b-chat-int8', { 
+        prompt,
+        max_tokens: 2000,
+        temperature: 0.2,
+        stream: false
+      });
+
+      let modifiedContent = '';
+      if (response && typeof response === 'object' && 'response' in response) {
+        modifiedContent = (response.response as string).trim();
+      } else if (response instanceof ReadableStream) {
+        const reader = response.getReader();
+        const decoder = new TextDecoder();
+        let result = await reader.read();
+        while (!result.done) {
+          modifiedContent += decoder.decode(result.value);
+          result = await reader.read();
+        }
+      }
+
+      if (!modifiedContent) {
+        throw new Error('Failed to get valid response from AI');
+      }
+
+      // Clean up any potential formatting
+      modifiedContent = modifiedContent
+        .replace(/^[\s\S]*?(?=import|export|class|function|const|let|var|\/\*|\/\/|<!DOCTYPE|<\?|<html)/i, '')  // Remove any prefix until code starts
+        .replace(/```[\w]*\n?|\n?```/g, '')  // Remove code block markers
+        .trim();
+
+      if (!modifiedContent) {
+        throw new Error('Failed to extract valid file content from AI response');
       }
       
-      // Update file in the new branch
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${change.filePath}`, {
+      // Update file in the branch
+      const updateResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${githubToken}`,
@@ -125,20 +253,21 @@ export async function applyChanges(
           'User-Agent': 'metrics-improvement-bot'
         },
         body: JSON.stringify({
-          message: `Update UI changes for ${change.filePath}`,
-          content: Buffer.from(lines.join('\n')).toString('base64'),
+          message: `Update UI changes for ${filePath}`,
+          content: Buffer.from(modifiedContent).toString('base64'),
           branch: branchName,
-          sha: await getFileSha(change.filePath, githubToken, owner, repo)
+          ...(fileSha && { sha: fileSha })
         })
       });
       
-      if (!response.ok) {
-        throw new Error(`Failed to update ${change.filePath}: ${response.statusText}`);
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json();
+        throw new Error(`Failed to update ${filePath}: ${updateResponse.statusText} - ${JSON.stringify(errorData)}`);
       }
       
-      console.log(`[Git] Successfully updated ${change.filePath}`);
+      console.log(`[Git] Successfully updated ${filePath}`);
     } catch (error) {
-      console.error(`[Git] Error updating ${change.filePath}:`, error);
+      console.error(`[Git] Error updating ${filePath}:`, error);
       throw error;
     }
   }
