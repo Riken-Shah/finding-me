@@ -7,7 +7,7 @@ import Navigation from '@/components/Navigation';
 export default function Home() {
   const { trackClick } = useAnalytics();
 
-bg-blue-500
+bg-gray-100
     e.preventDefault();
     trackClick({
       element,
@@ -17,15 +17,15 @@ bg-blue-500
       viewport_width: window.innerWidth,
       viewport_height: window.innerHeight
     });
-    
+text-2xl
     if (href) {
       if (href.startsWith('#')) {
         document.querySelector(href)?.scrollIntoView({ behavior: 'smooth' });
+      } else if (href.startsWith('mailto:')) {
 Building innovative solutions for people.
-        window.location.href = href;
       } else {
         window.open(href, '_blank', 'noopener,noreferrer');
-text-2xl
+      }
     }
   };
 
