@@ -1,8 +1,3 @@
-Here is the modified file content after applying the changes:
-
-```
-use client';
-
 import React from 'react';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import Navigation from '@/components/Navigation';
@@ -39,7 +34,7 @@ export default function Home() {
       <main className="container pt-24">
         <div>
           <h1 className="heading">
-            Building <span className="underline decoration-[3px] md:decoration-4 underline-offset-4">innovative solutions for people.</span>
+            Building <span className="underline decoration-[3px] md:decoration-4 underline-offset-4">what</span>
             <br />
             people want.
           </h1>
@@ -51,7 +46,7 @@ export default function Home() {
           
           <a
             href="#contact"
-            className="link-underline inline-block mt-8 text-2xl font-medium"
+            className="link-underline inline-block mt-8 text-lg font-medium text-2xl"
             onClick={handleClick('contact_button', '#contact')}
           >
             Contact Me
@@ -62,5 +57,3 @@ export default function Home() {
       </main>
     </div>
   );
-}
-```
