@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import Navigation from '@/components/Navigation';
@@ -30,7 +28,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-white antialiased">
+    <div className="min-h-screen bg-blue-500 antialiased">
       <Navigation />
       
       <main className="container pt-24">
@@ -48,7 +46,7 @@ export default function Home() {
           
           <a
             href="#contact"
-            className="link-underline inline-block mt-8 text-lg font-medium"
+            className="link-underline inline-block mt-8 text-2xl font-medium"
             onClick={handleClick('contact_button', '#contact')}
           >
             Contact Me
@@ -59,4 +57,3 @@ export default function Home() {
       </main>
     </div>
   );
-} 
