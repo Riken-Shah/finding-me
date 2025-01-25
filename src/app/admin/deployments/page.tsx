@@ -10,9 +10,9 @@ export const metadata = {
   title: 'Deployment Analytics | Admin',
   description: 'View and compare deployment performance metrics',
 };
-
+title='Deployment Analytics and Performance Metrics'
 export default function DeploymentAnalyticsPage() {
-  return (
+style={{ backgroundColor: '#f0f0f0' }}
     <main>
       <DeploymentAnalyticsDashboard />
     </main>
