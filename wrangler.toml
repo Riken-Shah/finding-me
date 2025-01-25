@@ -7,21 +7,24 @@ pages_build_output_dir = ".vercel/output/static"
 [[d1_databases]]
 binding = "DB"
 database_name = "analytics-db"
-database_id = "a6a0b776-e0da-40f7-b955-c966bf2ac02e"
+database_id = "e9ae067f-d6af-48e5-8349-3c0899145d36"
+migrations_dir = "migrations"
+
 
 [env.preview]
 [[env.preview.d1_databases]]
 binding = "DB"
-database_name = "analytics-db"
-database_id = "a6a0b776-e0da-40f7-b955-c966bf2ac02e"
+database_id = "e9ae067f-d6af-48e5-8349-3c0899145d36"
+migrations_dir = "migrations"
 
 # Production environment
 [env.production]
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "analytics-db"
-database_id = "a6a0b776-e0da-40f7-b955-c966bf2ac02e"
+database_id = "e9ae067f-d6af-48e5-8349-3c0899145d36"
 migrations_dir = "migrations"
+
 
 [ai]
 binding = "AI"

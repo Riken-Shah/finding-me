@@ -1,17 +1,21 @@
 {
-  "name": "ai",
-  "version": "0.0.0",
-  "private": true,
+  "name": "metrics-improvement-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker that analyzes metrics and suggests UI improvements",
+  "main": "dist/index.js",
   "scripts": {
+    "build": "wrangler build",
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev",
     "start": "wrangler dev",
-    "test": "vitest",
-    "cf-typegen": "wrangler types"
+    "test": "vitest"
+  },
+  "dependencies": {
+    "simple-git": "^3.22.0",
+    "@types/node": "^20.11.16"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.5.2",
     "@cloudflare/workers-types": "^4.20250121.0",
+    "@cloudflare/vitest-pool-workers": "^0.5.2",
     "typescript": "^5.5.2",
     "vitest": "2.1.8",
     "wrangler": "^3.103.2"

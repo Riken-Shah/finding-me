@@ -16,10 +16,11 @@
   "d1_databases": [
     {
       "binding": "DB",
-        "database_id": "a6a0b776-e0da-40f7-b955-c966bf2ac02e",
+        "database_id": "e9ae067f-d6af-48e5-8349-3c0899145d36",
         "database_name": "analytics-db"
     }
-  ]
+  ],
+  "compatibility_flags": ["nodejs_compat"]
   /**
    * Smart Placement
    * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
