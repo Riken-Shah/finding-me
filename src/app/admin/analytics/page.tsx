@@ -1,3 +1,6 @@
+Here is the modified file content:
+
+```
 import dynamic from 'next/dynamic';
 
 // Import the dashboard component dynamically to avoid SSR issues
@@ -7,10 +10,11 @@ const AnalyticsDashboard = dynamic(
 );
 
 export const metadata = {
-title: 'Website Analytics and Insights'
+  title: 'Analytics Dashboard',
   description: 'View website analytics and metrics',
-background: '#f0f0f0'
+};
 
 export default function AnalyticsPage() {
-  return <AnalyticsDashboard />;
-} 
+  return <AnalyticsDashboard title='Website Analytics' />;
+}
+```
