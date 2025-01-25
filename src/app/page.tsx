@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import Navigation from '@/components/Navigation';
@@ -30,7 +28,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-white antialiased">
+    <div className="min-h-screen bg-gray-100 antialiased">
       <Navigation />
       
       <main className="container pt-24">
@@ -41,7 +39,7 @@ export default function Home() {
             people want.
           </h1>
           
-          <p className="subheading mt-6 max-w-xl">
+          <p className="subheading mt-6 max-w-xl text-2xl">
             A personal space where I share my experiences,
             project insights, and thoughtful essays.
           </p>
@@ -59,4 +57,3 @@ export default function Home() {
       </main>
     </div>
   );
-} 
