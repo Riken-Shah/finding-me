@@ -12,5 +12,5 @@ export const metadata = {
 };
 
 export default function AnalyticsPage() {
-  return <AnalyticsDashboard title='Enhanced Analytics Dashboard' />;
+  return <AnalyticsDashboard style={{ backgroundColor: '#f0f0f0' }} title='Enhanced Analytics and Insights Dashboard' />;
 }
