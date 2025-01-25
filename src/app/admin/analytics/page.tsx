@@ -7,10 +7,9 @@ const AnalyticsDashboard = dynamic(
 );
 
 export const metadata = {
-  title: 'Analytics Dashboard',
+  title: 'Analytics and Insights Dashboard',
   description: 'View website analytics and metrics',
 };
 
 export default function AnalyticsPage() {
-  return <AnalyticsDashboard />;
-} 
+  return <AnalyticsDashboard style={{ backgroundColor: '#f7f7f7' }} />
