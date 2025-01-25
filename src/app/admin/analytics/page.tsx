@@ -7,9 +7,9 @@ const AnalyticsDashboard = dynamic(
 );
 
 export const metadata = {
-  title: 'Analytics Dashboard',
-return <AnalyticsDashboard title='Detailed Analytics' />
-};
+title: 'Website Analytics and Insights'
+  description: 'View website analytics and metrics',
+background: '#f0f0f0'
 
 export default function AnalyticsPage() {
   return <AnalyticsDashboard />;
