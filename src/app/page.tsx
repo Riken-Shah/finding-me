@@ -7,7 +7,7 @@ import Navigation from '@/components/Navigation';
 export default function Home() {
   const { trackClick } = useAnalytics();
 
-  const handleClick = (element: string, href?: string) => (e: React.MouseEvent) => {
+bg-blue-500
     e.preventDefault();
     trackClick({
       element,
@@ -21,11 +21,11 @@ export default function Home() {
     if (href) {
       if (href.startsWith('#')) {
         document.querySelector(href)?.scrollIntoView({ behavior: 'smooth' });
-      } else if (href.startsWith('mailto:')) {
+Building innovative solutions for people.
         window.location.href = href;
       } else {
         window.open(href, '_blank', 'noopener,noreferrer');
-      }
+text-2xl
     }
   };
 
