@@ -283,6 +283,8 @@ export default {
 			// 2. Analyze repository
 			console.log('[Git] Setting up repository analysis');
 			const repoUrl = 'https://github.com/riken-shah/finding-me';
+			// Token is loaded from environment variables
+			console.log('[Git] Using GitHub token from environment variables');
 			console.log("Github token: ", env.GITHUB_TOKEN)
 			const repoAnalysis = await analyzeRepo(repoUrl, env.GITHUB_TOKEN);
 			
