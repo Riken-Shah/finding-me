@@ -1,6 +1,3 @@
-Here is the modified file content:
-
-```
 import dynamic from 'next/dynamic';
 
 // Import the dashboard component dynamically to avoid SSR issues
@@ -18,10 +15,6 @@ export default function DeploymentAnalyticsPage() {
   return (
     <main>
       <h1>Deployment Analytics and Performance</h1>
-      <main style={{ backgroundColor: '#f7f7f7' }}>
-        <DeploymentAnalyticsDashboard />
-      </main>
+      <DeploymentAnalyticsDashboard style={{ backgroundColor: '#f0f0f0' }} />
     </main>
   );
-}
-```
